@@ -21,6 +21,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'telegram_chat_id',
+        'student_id',
+        'phone_number',
+        'branch',
+        'company',
+        'memo_time',
+        'summary_time'
     ];
 
     /**
@@ -40,5 +47,11 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'password' => 'hashed',
     ];
+
+    public function memos()
+    {
+        return $this->hasMany(Memo::class);
+    }
 }
