@@ -164,17 +164,16 @@ class TelegramController extends Controller
                         User::where('telegram_chat_id', $chat_id)->update([
                             $columnName[$userInformation] => $textUpdate
                         ]);
-
-                        app('telegram_bot')->sendMessage("แก้ไขข้อมูลเรียบร้อยแล้ว", $chat_id);
+                        app('telegram_bot')->sendMessage($chat_id, "แก้ไขข้อมูลเรียบร้อยแล้ว");
                         cache()->forget("chat_id_{$chat_id}_edit_user_info");
                     } else {
-                        app('telegram_bot')->sendMessage("ไม่พบข้อมูล user", $chat_id);
+                        app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
                     }
                 } elseif ($text === '/cancel') {
-                    app('telegram_bot')->sendMessage("ยกเลิกการ /editinfo", $chat_id);
+                    app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /editinfo");
                     cache()->forget("chat_id_{$chat_id}_edit_user_info");
                 } else {
-                    app('telegram_bot')->sendMessage("กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ", $chat_id);
+                    app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
                 cache()->forget("chat_id_{$chat_id}_edit_userInfo");
                 cache()->forget("chat_id_{$chat_id}_startEdit_userinfo");
