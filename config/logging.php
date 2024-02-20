@@ -118,6 +118,12 @@ return [
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
+        
+        'inbound' => [
+            'driver' => 'single',
+            'path' => '/dev/null', // Discard log messages
+            'level' => 'emergency', // Set the level to the highest priority
+        ],
     ],
 
 ];

@@ -22,11 +22,9 @@ class TelegramController extends Controller
     }
     public function inbound(Request $request)
     {
-        \Log::info($request->all());
+        \Log::channel('null')->info('Skipping logging for inbound message');
         $chat_id = $request->message['from']['id'] ?? null;
         $reply_to_message = $request->message['message_id'] ?? null;
-        \Log::info("chat_id: {$chat_id}");
-        \Log::info("reply_to_message: {$reply_to_message}");
 
         if ($request->message['text'] === '/start' || $request->message['text'] === '/help') {
             $chat_id = $request->message['from']['id'];
@@ -54,7 +52,7 @@ class TelegramController extends Controller
             $text .= "   /weeklysummary - สรุปงานประจำสัปดาห์\n";
             $text .= "   /generateDoc - สร้างเอกสารสรุปงานประจำสัปดาห์\n";
 
-            $result = app('telegram_bot')->sendMessage($text, $chat_id, $reply_to_message);
+            $result = app('telegram_bot')->sendMessage($chat_id, $reply_to_message, $text);
 
             return response()->json($result, 200);
         }
