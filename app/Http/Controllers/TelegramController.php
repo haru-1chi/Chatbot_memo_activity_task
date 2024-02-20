@@ -55,5 +55,32 @@ class TelegramController extends Controller
 
             return response()->json($result, 200);
         }
+
+        if ($request->message['text'] === '/getinfo') {
+            $userInfo = $this->getUserInfo($chat_id);
+            if ($userInfo) {
+                $text = "ข้อมูลส่วนตัวของคุณ:\n";
+                $text .= "1. ชื่อ-นามสกุล: {$userInfo['name']}\n";
+                $text .= "2. รหัสนิสิต: {$userInfo['student_id']}\n";
+                $text .= "3. เบอร์โทรศัพท์: {$userInfo['phone_number']}\n";
+                $text .= "4. สาขาวิชา: {$userInfo['branch']}\n";
+                $text .= "5. สถานประกอบการ: {$userInfo['company']}\n";
+                $text .= "หากต้องการแก้ไขข้อมูลส่วนตัว สามารถ /editinfo";
+                $result = app('telegram_bot')->sendMessage($chat_id, $text);
+                return response()->json($result, 200);
+            } else {
+                $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
+                $text .= "กรุณา /setinfo เพื่อตั้งค่าข้อมูลส่วนตัว";
+                $result = app('telegram_bot')->sendMessage($chat_id, $text);
+
+                return response()->json($result, 200);
+            }
+        }
+    }
+
+    public function getUserInfo($telegram_chat_id)
+    {
+        $userInfo = User::where('telegram_chat_id', $telegram_chat_id)->first();
+        return $userInfo;
     }
 }
