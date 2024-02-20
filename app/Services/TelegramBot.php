@@ -25,7 +25,7 @@ class TelegramBot
         ];
     }
 
-    public function sendMessage($chat_id, $reply_to_message_id = null, $text = '')
+    public function sendMessage($chat_id, $text = '')
     {
         $result = ['success' => false, 'body' => []];
 
@@ -33,10 +33,6 @@ class TelegramBot
             'chat_id' => $chat_id,
             'text' => $text,
         ];
-
-        if (!is_null($reply_to_message_id)) {
-            $params['reply_to_message_id'] = $reply_to_message_id;
-        }
 
         $url = "{$this->api_endpoint}/{$this->token}/sendMessage";
 
