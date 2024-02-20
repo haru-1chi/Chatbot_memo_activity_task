@@ -382,36 +382,33 @@ class TelegramController extends Controller
     }
     public function generateDocument(Request $request)
     {
-        $templateProcessor = new TemplateProcessor('word-template/user.docx');
         $chat_id = $request->message['from']['id'] ?? null;
         $userInfo = $this->getUserInfo($chat_id);
-        $memos = Memo::where('user_id', $chat_id)->get();
-        $currentWeekStartDate = null;
-        $currentWeekNumber = 0;
-        foreach ($memos as $memo) {
-            $memoDate = Carbon::parse($memo->memo_date);
-            if (!$currentWeekStartDate || !$memoDate->isSameWeek($currentWeekStartDate, Carbon::MONDAY)) {
-                $currentWeekStartDate = $memoDate;
-                $currentWeekNumber++;
-            }
-            $weekdayIndex = $memoDate->dayOfWeekIso;
-            $templateProcessor->setValue("number_of_week", $currentWeekNumber);
-            $templateProcessor->setValue("memo_date_$weekdayIndex", $memo->memo_date);
-            $templateProcessor->setValue("memo[0]_$weekdayIndex", $this->getMemo($memo->memo, 0));
-            $templateProcessor->setValue("memo[1]_$weekdayIndex", $this->getMemo($memo->memo, 1));
-            $templateProcessor->setValue("memo[2]_$weekdayIndex", $this->getMemo($memo->memo, 2));
-            $templateProcessor->setValue("memo[3]_$weekdayIndex", $this->getMemo($memo->memo, 3));
-            $templateProcessor->setValue("memo[4]_$weekdayIndex", $this->getMemo($memo->memo, 4));
-            $templateProcessor->setValue("note_today_$weekdayIndex", $memo->note_today);
-        }
         $directory = 'word-send';
-        $fileName = $userInfo['student_id'] . '_week' . $currentWeekNumber . '_memo.docx';
-        $filePath = public_path($directory . DIRECTORY_SEPARATOR . $fileName);
-
         if (!file_exists(public_path($directory))) {
             mkdir(public_path($directory), 0777, true);
         }
+        $templateProcessor = new TemplateProcessor('word-template/user.docx');
+        $currentWeekStartDate = Carbon::now()->startOfWeek();
+        $currentWeekNumber = $currentWeekStartDate->weekOfYear;
+    
+        $memos = Memo::where('user_id', $chat_id)
+                      ->whereBetween('memo_date', [$currentWeekStartDate, $currentWeekStartDate->copy()->endOfWeek()])
+                      ->get();
+    
+        foreach ($memos as $memo) {
+            $weekdayIndex = Carbon::parse($memo->memo_date)->dayOfWeekIso;
+            $templateProcessor->setValue("number_of_week", $currentWeekNumber);
+            $templateProcessor->setValue("memo_date_$weekdayIndex", $memo->memo_date);
+            for ($i = 0; $i < 5; $i++) {
+                $templateProcessor->setValue("memo[$i]_$weekdayIndex", $this->getMemo($memo->memo, $i));
+            }
+            $templateProcessor->setValue("note_today_$weekdayIndex", $memo->note_today);
+        }
+        $fileName = $userInfo['student_id'] . '_week' . $currentWeekNumber . '_memo.docx';
+        $filePath = public_path($directory . DIRECTORY_SEPARATOR . $fileName);
         $templateProcessor->saveAs($filePath);
+    
         return $filePath;
     }
     public function confirmUserInfo(Request $request)
