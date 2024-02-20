@@ -77,6 +77,6 @@ class SendMemoMessages extends Command
      */
     private function sendMessageToUser($chatId, $message)
     {
-        $this->telegramBot->sendMessage($message, $chatId);
+        $this->telegramBot->sendMessage($chatId, $message);
     }
 }
