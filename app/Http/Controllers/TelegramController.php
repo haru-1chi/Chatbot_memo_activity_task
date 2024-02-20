@@ -126,8 +126,7 @@ class TelegramController extends Controller
                     $text .= "1. {$columnName[$selectedIndex]}\n";
                     cache()->put("chat_id_{$chat_id}_startEdit_userinfo", 'updated', now()->addMinutes(60));
                     cache()->put("chat_id_{$chat_id}_select_choice_edit", $selectedIndex, now()->addMinutes(60));
-                    $reply_to_message = $request->message['message_id'] ?? null;
-                    $result = app('telegram_bot')->sendMessage($text, $chat_id, $reply_to_message);
+                    $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
                 }
@@ -208,7 +207,6 @@ class TelegramController extends Controller
     public function confirmUserInfo(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
-        $reply_to_message = $request->message['message_id'] ?? null;
         $step = cache()->get("chat_id_{$chat_id}_user_info");
         if ($step) {
             $userInformationLines = explode("\n", $request->message['text']);
@@ -228,17 +226,12 @@ class TelegramController extends Controller
                 $text .= "สถานประกอบการ: $company\n";
                 $text .= "ถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)";
 
-                $result = app('telegram_bot')->sendMessage($text, $chat_id, $reply_to_message);
+                $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                 cache()->put("chat_id_{$chat_id}_user_info", compact('name', 'student_id', 'phone_number', 'branch', 'company'), now()->addMinutes(10));
                 cache()->put("chat_id_{$chat_id}_user_info_confirm", true, now()->addMinutes(10));
                 return response()->json($result, 200);
             }
-            //   else {
-            //     $text = "กรุณากรอกข้อมูลให้ครบถ้วนตามรูปแบบที่กำหนด";
-            //     $result = app('telegram_bot')->sendMessage($text, $chat_id, $reply_to_message);
-            //     return response()->json($result, 200);
-            // }
 
             if (cache()->has("chat_id_{$chat_id}_user_info_confirm")) {
                 cache()->forget("chat_id_{$chat_id}_user_info_confirm");
