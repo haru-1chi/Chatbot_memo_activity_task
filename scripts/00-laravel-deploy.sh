@@ -16,6 +16,10 @@ php artisan route:cache
 echo "Running migrations..."
 php artisan migrate --force
 
+# Set up cron job for Laravel scheduler
+echo "Setting up cron job for Laravel scheduler..."
+echo "* * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1" > /etc/cron.d/laravel-scheduler
+
 #echo "Running seeders..."
 #php artisan db:seed
 
