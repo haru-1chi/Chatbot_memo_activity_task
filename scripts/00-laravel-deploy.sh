@@ -25,8 +25,8 @@ php artisan route:cache
 echo "Running migrations..."
 php artisan migrate --force
 
-# echo "Setting up cron job for Laravel scheduler..."
-# php artisan schedule:work
+echo "Setting up cron job for Laravel scheduler..."
+php artisan schedule:work
 
 #echo "Running seeders..."
 #php artisan db:seed
