@@ -16,21 +16,22 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $users = User::whereNotNull('telegram_chat_id')->get();
-        foreach ($users as $user) {
-            if ($user->memo_time && $user->summary_time) {
-                $memoTime = Carbon::createFromFormat('H:i:s', $user->memo_time);
-                $memoHourAndMinute = $memoTime->format('H:i');
-                $schedule->command('send:memo-messages')->dailyAt($memoHourAndMinute);
+        $schedule->command('send:memo-messages')->everyMinute();
+        // $users = User::whereNotNull('telegram_chat_id')->get();
+        // foreach ($users as $user) {
+        //     if ($user->memo_time && $user->summary_time) {
+        //         $memoTime = Carbon::createFromFormat('H:i:s', $user->memo_time);
+        //         $memoHourAndMinute = $memoTime->format('H:i');
+        //         $schedule->command('send:memo-messages')->dailyAt($memoHourAndMinute);
 
-                $summaryTime = Carbon::createFromFormat('H:i:s', $user->summary_time);
-                $summaryHourAndMinute = $summaryTime->format('H:i');
-                $schedule->command('send:summary-messages')->dailyAt($summaryHourAndMinute);
-            } else {
-                $schedule->command('send:memo-messages')->dailyAt('12:00');
-                $schedule->command('send:summary-messages')->dailyAt('18:00');
-            }
-        }
+        //         $summaryTime = Carbon::createFromFormat('H:i:s', $user->summary_time);
+        //         $summaryHourAndMinute = $summaryTime->format('H:i');
+        //         $schedule->command('send:summary-messages')->dailyAt($summaryHourAndMinute);
+        //     } else {
+        //         $schedule->command('send:memo-messages')->dailyAt('12:00');
+        //         $schedule->command('send:summary-messages')->dailyAt('18:00');
+        //     }
+        // }
     }
 
     /**

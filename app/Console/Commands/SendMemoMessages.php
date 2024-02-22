@@ -48,7 +48,6 @@ class SendMemoMessages extends Command
                 if ($user->memo_time) {
                     $memoTime = Carbon::createFromFormat('H:i:s', $user->memo_time)->format('H:i');
                     $currentTimeFormatted = $currentTime->format('H:i');
-
                     if ($currentTimeFormatted === $memoTime) {
                         $text = "วันนี้อย่าลืมจดบันทึกงานประจำวันด้วยนะ\n";
                         $text .= "กรุณาพิมพ์ /memo เพื่อเริ่มจดบันทึก\n\n";
@@ -62,7 +61,6 @@ class SendMemoMessages extends Command
                     $this->sendMessageToUser($user->telegram_chat_id, $text);
                 }
             }
-
         }
 
         return 0;
