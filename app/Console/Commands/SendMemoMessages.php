@@ -54,7 +54,7 @@ class SendMemoMessages extends Command
                         $text .= "หรือหากวันนี้ลาหยุด หรือเป็นวันหยุดราชการ ให้พิมพ์ /notetoday เพื่อเพิ่มหมายเหตุวันนี้\n";
                         $this->sendMessageToUser($user->telegram_chat_id, $text);
                     }
-                } else {
+                } elseif (!$user->memo_time && $currentTime->format('H:i') === '12:00') {
                     $text = "นี่เป็นข้อความแจ้งเตือนให้จดบันทึกประจำวันเบื้องต้น\n";
                     $text .= "กรุณา /setreminder เพื่อตั้งค่าการแจ้งเตือน\n\n";
                     $text .= "อย่าลืมตั้งค่าเวลาแจ้งเตือนบันทึกประจำวันด้วยนะ\n";
