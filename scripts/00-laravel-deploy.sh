@@ -26,8 +26,8 @@ echo "Running migrations..."
 php artisan migrate --force
 
 # Set up cron job for Laravel scheduler
-echo "Setting up cron job for Laravel scheduler..."
-php artisan schedule:work
+# echo "Setting up cron job for Laravel scheduler..."
+# php artisan schedule:work
 
 #echo "Running seeders..."
 #php artisan db:seed
