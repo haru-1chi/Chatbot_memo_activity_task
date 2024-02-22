@@ -809,14 +809,20 @@ class TelegramController extends Controller
             mkdir(public_path($directory), 0777, true);
         }
         $templateProcessor = new TemplateProcessor('word-template/user.docx');
-        $currentWeekStartDate = Carbon::now()->startOfWeek();
-        $currentWeekNumber = $currentWeekStartDate->weekOfYear;
-
-        $memos = Memo::where('user_id', $chat_id)
-            ->whereBetween('memo_date', [$currentWeekStartDate, $currentWeekStartDate->copy()->endOfWeek()])
+        $memoDates = Memo::where('user_id', $chat_id)
+            ->pluck('memo_date')
+            ->unique();
+        $currentWeekNumber = $memoDates->map(function ($date) {
+            return Carbon::parse($date)->weekOfYear;
+        })->unique()->count();
+        $latestWeekMemos = Memo::where('user_id', $chat_id)
+            ->whereBetween('memo_date', [
+                Carbon::now()->startOfWeek()->format('Y-m-d'),
+                Carbon::now()->endOfWeek()->format('Y-m-d')
+            ])
+            ->orderBy('memo_date')
             ->get();
-
-        foreach ($memos as $memo) {
+        foreach ($latestWeekMemos as $memo) {
             $weekdayIndex = Carbon::parse($memo->memo_date)->dayOfWeekIso;
             $templateProcessor->setValue("number_of_week", $currentWeekNumber);
             $templateProcessor->setValue("memo_date_$weekdayIndex", $memo->memo_date);
@@ -828,7 +834,6 @@ class TelegramController extends Controller
         $fileName = $userInfo['student_id'] . '_week' . $currentWeekNumber . '_memo.docx';
         $filePath = public_path($directory . DIRECTORY_SEPARATOR . $fileName);
         $templateProcessor->saveAs($filePath);
-
         return $filePath;
     }
     public function confirmUserInfo(Request $request)
