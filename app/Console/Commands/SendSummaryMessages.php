@@ -50,7 +50,6 @@ class SendSummaryMessages extends Command
                     $summaryTime = Carbon::createFromFormat('H:i:s', $user->summary_time)->format('H:i');
                     $currentTimeFormatted = $currentTime->format('H:i');
                     if ($currentTimeFormatted === $summaryTime) {
-
                         $userMemo = $this->getUserMemo($user->telegram_chat_id);
                         if (!$userMemo || (!$userMemo['memo'] && !$userMemo['note_today'])) {
                             $text = "สรุปงานที่ได้ทำในวันนี้:\n";
