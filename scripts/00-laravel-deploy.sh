@@ -26,8 +26,9 @@ echo "Running migrations..."
 php artisan migrate --force
 
 echo "Setting up cron job for Laravel scheduler..."
-chmod 755 /etc/cron.d/
-cd /var/www/html && php artisan schedule:run >> /var/www/html/cron.log 2>&1
+php artisan schedule:work
+# chmod 755 /etc/cron.d/
+# cd /var/www/html && php artisan schedule:run >> /var/www/html/cron.log 2>&1
 echo "Deployment complete."
 
 # echo "Setting up cron job for Laravel scheduler..."
