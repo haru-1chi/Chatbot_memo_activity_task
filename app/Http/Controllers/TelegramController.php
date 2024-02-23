@@ -822,15 +822,29 @@ class TelegramController extends Controller
             ])
             ->orderBy('memo_date')
             ->get();
-        foreach ($latestWeekMemos as $memo) {
-            $weekdayIndex = Carbon::parse($memo->memo_date)->dayOfWeekIso;
-            $templateProcessor->setValue("number_of_week", $currentWeekNumber);
-            $templateProcessor->setValue("memo_date_$weekdayIndex", $memo->memo_date);
-            for ($i = 0; $i < 5; $i++) {
-                $templateProcessor->setValue("memo[$i]_$weekdayIndex", $this->getMemo($memo->memo, $i));
+            $latestWeekMemosIndexed = [];
+            foreach ($latestWeekMemos as $memo) {
+                $weekdayIndex = Carbon::parse($memo->memo_date)->dayOfWeekIso;
+                $latestWeekMemosIndexed[$weekdayIndex] = $memo;
             }
-            $templateProcessor->setValue("note_today_$weekdayIndex", $memo->note_today);
-        }
+    
+            for ($i = 1; $i <= 7; $i++) {
+                if (!isset($latestWeekMemosIndexed[$i])) {
+                    $templateProcessor->setValue("memo_date_$i", '');
+                    for ($j = 0; $j < 5; $j++) {
+                        $templateProcessor->setValue("memo[$j]_$i", '……………………………………………………………………………………');
+                    }
+                    $templateProcessor->setValue("note_today_$i", '');
+                } else {
+                    $memo = $latestWeekMemosIndexed[$i];
+                    $templateProcessor->setValue("number_of_week", $currentWeekNumber);
+                    $templateProcessor->setValue("memo_date_$i", $memo->memo_date);
+                    for ($j = 0; $j < 5; $j++) {
+                        $templateProcessor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
+                    }
+                    $templateProcessor->setValue("note_today_$i", $memo->note_today);
+                }
+            }
         $fileName = $userInfo['student_id'] . '_week' . $currentWeekNumber . '_memo.docx';
         $filePath = public_path($directory . DIRECTORY_SEPARATOR . $fileName);
         $templateProcessor->saveAs($filePath);
