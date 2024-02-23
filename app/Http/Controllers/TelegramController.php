@@ -48,7 +48,6 @@ class TelegramController extends Controller
             $text .= "   /resetmemo - ล้างบันทึกงานประจำวัน\n";
             $text .= "   /resetnotetoday - ล้างหมายเหตุประจำวัน\n\n";
 
-            $text .= "   /weeklysummary - สรุปงานประจำสัปดาห์\n";
             $text .= "   /generateDoc - สร้างเอกสารสรุปงานประจำสัปดาห์\n";
 
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
@@ -400,11 +399,11 @@ class TelegramController extends Controller
                         $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formattedMemo);
                         $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
-                        cache()->put("chat_id_{$chat_id}_startAddMemoDairy", 'waiting_for_time', now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_startMemoDairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
                         $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก";
                         app('telegram_bot')->sendMessage($chat_id, $text);
-                        cache()->put("chat_id_{$chat_id}_startAddMemoDairy", 'waiting_for_command', now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_startMemoDairy", 'waiting_for_command', now()->addMinutes(60));
                     }
                 } else {
                     $memoMessages = cache()->get("chat_id_{$chat_id}_memoDaily", []);
