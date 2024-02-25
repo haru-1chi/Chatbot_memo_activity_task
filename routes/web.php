@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\WordController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -22,5 +21,3 @@ Route::get('/users', function () {
     $users = DB::table('users')->get();
     return view('users', compact('users'));
 });
-Route::get('/test-render', [WordController::class, 'testRender']);
-Route::get('/downloadDocx', [WordController::class, 'downloadDocx']);
