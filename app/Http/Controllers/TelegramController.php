@@ -867,7 +867,7 @@ class TelegramController extends Controller
 
         return $pdf_file_path;
     }
-    public function generateDocument(Request $request)
+    public function generateWord(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
         $userInfo = $this->getUserInfo($chat_id);
