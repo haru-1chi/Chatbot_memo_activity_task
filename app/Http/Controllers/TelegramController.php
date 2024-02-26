@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use PhpOffice\PhpWord\TemplateProcessor;
-use PhpOffice\PhpWord\Element\Section;
-use PhpOffice\PhpWord\PhpWord;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use PhpOffice\PhpWord\IOFactory;
 use App\Models\User;
 use App\Models\Memo;
 use Illuminate\Http\Request;
@@ -22,7 +24,7 @@ class TelegramController extends Controller
     }
     public function inbound(Request $request)
     {
-        \Log::channel('null')->info('Skipping logging for inbound message');
+        Log::channel('null')->info('Skipping logging for inbound message');
         $chat_id = $request->message['from']['id'] ?? null;
 
         if ($request->message['text'] === '/start' || $request->message['text'] === '/help') {
@@ -776,11 +778,94 @@ class TelegramController extends Controller
         }
         //generatedoc
         if ($request->message['text'] === '/generatedoc') {
-            $documentPath = $this->generateDocument($request);
-            $result = app('telegram_bot')->sendDocument($chat_id, $documentPath);
-            return response()->json($result, 200);
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
+                // $word_path = $this->generateWord($request);
+                $pdf_path = $this->generatePDF($request);
+                // app('telegram_bot')->sendDocument($chat_id, $word_path);
+                app('telegram_bot')->sendDocument($chat_id, $pdf_path);
+            } else {
+                $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
+                $text .= "กรุณา /setinfo เพื่อตั้งค่าข้อมูลส่วนตัวก่อนทำการจดบันทึกใดๆ";
+                $result = app('telegram_bot')->sendMessage($text, $chat_id, $reply_to_message);
+                return response()->json($result, 200);
+            }
         }
     }
+    public function generatePDF(Request $request)
+{
+    $chat_id = $request->message['from']['id'] ?? null;
+    $user_info = $this->getUserInfo($chat_id);
+    $directory = 'word-send';
+    if (!file_exists(public_path($directory))) {
+        mkdir(public_path($directory), 0777, true);
+    }
+    $template_processor = new TemplateProcessor('word-template/user.docx');
+    $memo_dates = Memo::where('user_id', $chat_id)
+        ->pluck('memo_date')
+        ->unique();
+    $current_week_number = $memo_dates->map(function ($date) {
+        return Carbon::parse($date)->weekOfYear;
+    })->unique()->count();
+    $latest_week_memos = Memo::where('user_id', $chat_id)
+        ->whereBetween('memo_date', [
+            Carbon::now()->startOfWeek()->format('Y-m-d'),
+            Carbon::now()->endOfWeek()->format('Y-m-d')
+        ])
+        ->orderBy('memo_date')
+        ->get();
+    $latest_week_memos_indexed = [];
+    foreach ($latest_week_memos as $memo) {
+        $weekday_index = Carbon::parse($memo->memo_date)->dayOfWeekIso;
+        $latest_week_memos_indexed[$weekday_index] = $memo;
+    }
+
+    for ($i = 1; $i <= 7; $i++) {
+        if (!isset($latest_week_memos_indexed[$i])) {
+            $template_processor->setValue("memo_date_$i", '');
+            for ($j = 0; $j < 5; $j++) {
+                $template_processor->setValue("memo[$j]_$i", '……………………………………………………………………………………');
+            }
+            $template_processor->setValue("note_today_$i", '');
+        } else {
+            $memo = $latest_week_memos_indexed[$i];
+            $template_processor->setValue("number_of_week", $current_week_number);
+            $template_processor->setValue("memo_date_$i", $memo->memo_date);
+            for ($j = 0; $j < 5; $j++) {
+                $template_processor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
+            }
+            $template_processor->setValue("note_today_$i", $memo->note_today);
+        }
+    }
+    $file_name = $user_info['student_id'] . '_week1_memo.docx';
+    $file_path = public_path($directory . DIRECTORY_SEPARATOR . $file_name);
+    $template_processor->saveAs($file_path);
+
+    $php_word = IOFactory::load($file_path);
+    $html_writer = IOFactory::createWriter($php_word, 'HTML');
+    $html_file_path = public_path($directory . DIRECTORY_SEPARATOR . 'temp.html');
+    $html_writer->save($html_file_path);
+
+    $dompdf = new Dompdf();
+    $options = new Options();
+    $options->set('isHtml5ParserEnabled', true);
+    $dompdf->setOptions($options);
+
+    $html_content = file_get_contents($html_file_path);
+    $dompdf->loadHtml($html_content);
+
+    $dompdf->setPaper('A4', 'portrait');
+
+    $dompdf->render();
+
+    $pdf_file_path = public_path($directory . DIRECTORY_SEPARATOR . 'output.pdf');
+    file_put_contents($pdf_file_path, $dompdf->output());
+
+    unlink($file_path);
+    unlink($html_file_path);
+
+    return $pdf_file_path;
+}
     public function generateDocument(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
