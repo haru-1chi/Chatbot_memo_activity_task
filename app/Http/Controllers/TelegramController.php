@@ -780,10 +780,10 @@ class TelegramController extends Controller
         if ($request->message['text'] === '/generatedoc') {
             $user_info = $this->getUserInfo($chat_id);
             if ($user_info) {
-                // $word_path = $this->generateWord($request);
-                $pdf_path = $this->generatePDF($request);
-                // app('telegram_bot')->sendDocument($chat_id, $word_path);
-                app('telegram_bot')->sendDocument($chat_id, $pdf_path);
+                $word_path = $this->generateWord($request);
+                // $pdf_path = $this->generatePDF($request);
+                app('telegram_bot')->sendDocument($chat_id, $word_path);
+                // app('telegram_bot')->sendDocument($chat_id, $pdf_path);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
                 $text .= "กรุณา /setinfo เพื่อตั้งค่าข้อมูลส่วนตัวก่อนทำการจดบันทึกใดๆ";
@@ -792,80 +792,81 @@ class TelegramController extends Controller
             }
         }
     }
+
     public function generatePDF(Request $request)
-{
-    $chat_id = $request->message['from']['id'] ?? null;
-    $user_info = $this->getUserInfo($chat_id);
-    $directory = 'word-send';
-    if (!file_exists(public_path($directory))) {
-        mkdir(public_path($directory), 0777, true);
-    }
-    $template_processor = new TemplateProcessor('word-template/user.docx');
-    $memo_dates = Memo::where('user_id', $chat_id)
-        ->pluck('memo_date')
-        ->unique();
-    $current_week_number = $memo_dates->map(function ($date) {
-        return Carbon::parse($date)->weekOfYear;
-    })->unique()->count();
-    $latest_week_memos = Memo::where('user_id', $chat_id)
-        ->whereBetween('memo_date', [
-            Carbon::now()->startOfWeek()->format('Y-m-d'),
-            Carbon::now()->endOfWeek()->format('Y-m-d')
-        ])
-        ->orderBy('memo_date')
-        ->get();
-    $latest_week_memos_indexed = [];
-    foreach ($latest_week_memos as $memo) {
-        $weekday_index = Carbon::parse($memo->memo_date)->dayOfWeekIso;
-        $latest_week_memos_indexed[$weekday_index] = $memo;
-    }
-
-    for ($i = 1; $i <= 7; $i++) {
-        if (!isset($latest_week_memos_indexed[$i])) {
-            $template_processor->setValue("memo_date_$i", '');
-            for ($j = 0; $j < 5; $j++) {
-                $template_processor->setValue("memo[$j]_$i", '……………………………………………………………………………………');
-            }
-            $template_processor->setValue("note_today_$i", '');
-        } else {
-            $memo = $latest_week_memos_indexed[$i];
-            $template_processor->setValue("number_of_week", $current_week_number);
-            $template_processor->setValue("memo_date_$i", $memo->memo_date);
-            for ($j = 0; $j < 5; $j++) {
-                $template_processor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
-            }
-            $template_processor->setValue("note_today_$i", $memo->note_today);
+    {
+        $chat_id = $request->message['from']['id'] ?? null;
+        $user_info = $this->getUserInfo($chat_id);
+        $directory = 'word-send';
+        if (!file_exists(public_path($directory))) {
+            mkdir(public_path($directory), 0777, true);
         }
+        $template_processor = new TemplateProcessor('word-template/user.docx');
+        $memo_dates = Memo::where('user_id', $chat_id)
+            ->pluck('memo_date')
+            ->unique();
+        $current_week_number = $memo_dates->map(function ($date) {
+            return Carbon::parse($date)->weekOfYear;
+        })->unique()->count();
+        $latest_week_memos = Memo::where('user_id', $chat_id)
+            ->whereBetween('memo_date', [
+                Carbon::now()->startOfWeek()->format('Y-m-d'),
+                Carbon::now()->endOfWeek()->format('Y-m-d')
+            ])
+            ->orderBy('memo_date')
+            ->get();
+        $latest_week_memos_indexed = [];
+        foreach ($latest_week_memos as $memo) {
+            $weekday_index = Carbon::parse($memo->memo_date)->dayOfWeekIso;
+            $latest_week_memos_indexed[$weekday_index] = $memo;
+        }
+
+        for ($i = 1; $i <= 7; $i++) {
+            if (!isset($latest_week_memos_indexed[$i])) {
+                $template_processor->setValue("memo_date_$i", '');
+                for ($j = 0; $j < 5; $j++) {
+                    $template_processor->setValue("memo[$j]_$i", '……………………………………………………………………………………');
+                }
+                $template_processor->setValue("note_today_$i", '');
+            } else {
+                $memo = $latest_week_memos_indexed[$i];
+                $template_processor->setValue("number_of_week", $current_week_number);
+                $template_processor->setValue("memo_date_$i", $memo->memo_date);
+                for ($j = 0; $j < 5; $j++) {
+                    $template_processor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
+                }
+                $template_processor->setValue("note_today_$i", $memo->note_today);
+            }
+        }
+        $file_name = $user_info['student_id'] . '_week1_memo.docx';
+        $file_path = public_path($directory . DIRECTORY_SEPARATOR . $file_name);
+        $template_processor->saveAs($file_path);
+
+        $php_word = IOFactory::load($file_path);
+        $html_writer = IOFactory::createWriter($php_word, 'HTML');
+        $html_file_path = public_path($directory . DIRECTORY_SEPARATOR . 'temp.html');
+        $html_writer->save($html_file_path);
+
+        $dompdf = new Dompdf();
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $dompdf->setOptions($options);
+
+        $html_content = file_get_contents($html_file_path);
+        $dompdf->loadHtml($html_content);
+
+        $dompdf->setPaper('A4', 'portrait');
+
+        $dompdf->render();
+
+        $pdf_file_path = public_path($directory . DIRECTORY_SEPARATOR . 'output.pdf');
+        file_put_contents($pdf_file_path, $dompdf->output());
+
+        unlink($file_path);
+        unlink($html_file_path);
+
+        return $pdf_file_path;
     }
-    $file_name = $user_info['student_id'] . '_week1_memo.docx';
-    $file_path = public_path($directory . DIRECTORY_SEPARATOR . $file_name);
-    $template_processor->saveAs($file_path);
-
-    $php_word = IOFactory::load($file_path);
-    $html_writer = IOFactory::createWriter($php_word, 'HTML');
-    $html_file_path = public_path($directory . DIRECTORY_SEPARATOR . 'temp.html');
-    $html_writer->save($html_file_path);
-
-    $dompdf = new Dompdf();
-    $options = new Options();
-    $options->set('isHtml5ParserEnabled', true);
-    $dompdf->setOptions($options);
-
-    $html_content = file_get_contents($html_file_path);
-    $dompdf->loadHtml($html_content);
-
-    $dompdf->setPaper('A4', 'portrait');
-
-    $dompdf->render();
-
-    $pdf_file_path = public_path($directory . DIRECTORY_SEPARATOR . 'output.pdf');
-    file_put_contents($pdf_file_path, $dompdf->output());
-
-    unlink($file_path);
-    unlink($html_file_path);
-
-    return $pdf_file_path;
-}
     public function generateDocument(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
@@ -903,8 +904,9 @@ class TelegramController extends Controller
                 $templateProcessor->setValue("note_today_$i", '');
             } else {
                 $memo = $latestWeekMemosIndexed[$i];
+                $thaiDate = $this->formatThaiDate($memo->memo_date);
                 $templateProcessor->setValue("number_of_week", $currentWeekNumber);
-                $templateProcessor->setValue("memo_date_$i", $memo->memo_date);
+                $templateProcessor->setValue("memo_date_$i", $thaiDate);
                 for ($j = 0; $j < 5; $j++) {
                     $templateProcessor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
                 }
@@ -916,6 +918,30 @@ class TelegramController extends Controller
         $templateProcessor->saveAs($filePath);
         return $filePath;
     }
+    private function formatThaiDate($date)
+    {
+        $thaiMonths = [
+            '01' => 'ม.ค.',
+            '02' => 'ก.พ.',
+            '03' => 'มี.ค.',
+            '04' => 'เม.ย.',
+            '05' => 'พ.ค.',
+            '06' => 'มิ.ย.',
+            '07' => 'ก.ค.',
+            '08' => 'ส.ค.',
+            '09' => 'ก.ย.',
+            '10' => 'ต.ค.',
+            '11' => 'พ.ย.',
+            '12' => 'ธ.ค.'
+        ];
+
+        $year = (int) date('Y', strtotime($date)) + 543;
+        $month = date('m', strtotime($date));
+        $day = date('d', strtotime($date));
+
+        return "$day {$thaiMonths[$month]} $year";
+    }
+
     //function_setinfo
     protected function handleSetInfoCommand($chat_id)
     {
