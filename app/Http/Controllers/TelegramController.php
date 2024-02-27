@@ -161,7 +161,11 @@ class TelegramController extends Controller
                 $this->handleConfirmation(
                     $request,
                     $chat_id,
-                    'chat_id_' . $chat_id . '_edit_user_info',
+                    [
+                        "chat_id_{$chat_id}_start_edit_reminder",
+                        "chat_id_{$chat_id}_edit_reminder",
+                        "chat_id_{$chat_id}_select_type_edit"
+                    ],
                     'แก้ไขข้อมูลเรียบร้อยแล้ว',
                     'ยกเลิกการ /editinfo',
                     function () use ($chat_id) {
@@ -1077,7 +1081,7 @@ class TelegramController extends Controller
     protected function handleConfirmation( //everything
         $request,
         $chat_id,
-        $cache_key_prefix,
+        $cacheKeys,
         $success_message,
         $cancel_message,
         $update_callback = null
@@ -1094,9 +1098,9 @@ class TelegramController extends Controller
             }
         } elseif ($text === '/cancel') {
             app('telegram_bot')->sendMessage($chat_id, $cancel_message);
-            cache()->forget("chat_id_{$chat_id}_edit_user_info");
-            cache()->forget("chat_id_{$chat_id}_start_edit_info");
-            cache()->forget("chat_id_{$chat_id}_select_choice_edit");
+            foreach ($cacheKeys as $cacheKey) {
+                cache()->forget($cacheKey);
+            }
         } else {
             app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
