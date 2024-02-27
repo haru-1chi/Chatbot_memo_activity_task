@@ -167,7 +167,7 @@ class TelegramController extends Controller
                     app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /editinfo");
                     cache()->forget("chat_id_{$chat_id}_edit_user_info");
                 } else {
-                    app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                    app('telegram_bot')->sendMessage($chat_id, "/edit user กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
                 cache()->forget("chat_id_{$chat_id}_edit_user_info");
                 cache()->forget("chat_id_{$chat_id}_start_edit_info");
@@ -430,7 +430,7 @@ class TelegramController extends Controller
                 } elseif ($text === '/cancel') {
                     app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /memo");
                 } else {
-                    app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                    app('telegram_bot')->sendMessage($chat_id, "/memo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
                 cache()->forget("chat_id_{$chat_id}_start_memo_dairy");
                 cache()->forget("chat_id_{$chat_id}_memo_daily");
@@ -551,7 +551,7 @@ class TelegramController extends Controller
                 } elseif ($text === '/cancel') {
                     app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /addmemo");
                 } else {
-                    app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                    app('telegram_bot')->sendMessage($chat_id, "/addmemo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
                 cache()->forget("chat_id_{$chat_id}_start_add_memo_dairy");
                 cache()->forget("chat_id_{$chat_id}_add_memo_daily");
@@ -625,7 +625,7 @@ class TelegramController extends Controller
                 } elseif ($text === '/cancel') {
                     app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /editmemo");
                 } else {
-                    app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                    app('telegram_bot')->sendMessage($chat_id, "/editmemo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
                 cache()->forget("chat_id_{$chat_id}_edit_memo_dairy");
                 cache()->forget("chat_id_{$chat_id}_start_edit_memo_dairy");
@@ -677,7 +677,7 @@ class TelegramController extends Controller
             } elseif ($text === '/cancel') {
                 app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /resetmemo");
             } else {
-                app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                app('telegram_bot')->sendMessage($chat_id, "/resetmemo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
             }
             cache()->forget("chat_id_{$chat_id}_start_reset_memo_dairy");
         }
@@ -721,7 +721,7 @@ class TelegramController extends Controller
             } elseif ($text === '/cancel') {
                 app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /resetnotetoday");
             } else {
-                app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                app('telegram_bot')->sendMessage($chat_id, "/resetnote กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
             }
             cache()->forget("chat_id_{$chat_id}_start_reset_notetoday");
         }
@@ -785,7 +785,7 @@ class TelegramController extends Controller
                 } elseif ($text === '/cancel') {
                     app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /notetoday");
                 } else {
-                    app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+                    app('telegram_bot')->sendMessage($chat_id, "/notetoday กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
                 cache()->forget("chat_id_{$chat_id}_start_notetoday");
                 cache()->forget("chat_id_{$chat_id}_notetoday");
@@ -894,57 +894,57 @@ class TelegramController extends Controller
     public function generateWord(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
-        $userInfo = $this->getUserInfo($chat_id);
+        $user_info = $this->getUserInfo($chat_id);
         $directory = 'word-send';
         if (!file_exists(public_path($directory))) {
             mkdir(public_path($directory), 0777, true);
         }
-        $templateProcessor = new TemplateProcessor('word-template/user.docx');
-        $memoDates = Memo::where('user_id', $chat_id)
+        $template_processor = new TemplateProcessor('word-template/user.docx');
+        $memo_dates = Memo::where('user_id', $chat_id)
             ->pluck('memo_date')
             ->unique();
-        $currentWeekNumber = $memoDates->map(function ($date) {
+        $current_week_number = $memo_dates->map(function ($date) {
             return Carbon::parse($date)->weekOfYear;
         })->unique()->count();
-        $latestWeekMemos = Memo::where('user_id', $chat_id)
+        $latest_week_memos = Memo::where('user_id', $chat_id)
             ->whereBetween('memo_date', [
                 Carbon::now()->startOfWeek()->format('Y-m-d'),
                 Carbon::now()->endOfWeek()->format('Y-m-d')
             ])
             ->orderBy('memo_date')
             ->get();
-        $latestWeekMemosIndexed = [];
-        foreach ($latestWeekMemos as $memo) {
-            $weekdayIndex = Carbon::parse($memo->memo_date)->dayOfWeekIso;
-            $latestWeekMemosIndexed[$weekdayIndex] = $memo;
+        $latest_week_memos_indexed = [];
+        foreach ($latest_week_memos as $memo) {
+            $weekday_index = Carbon::parse($memo->memo_date)->dayOfWeekIso;
+            $latest_week_memos_indexed[$weekday_index] = $memo;
         }
 
         for ($i = 1; $i <= 7; $i++) {
-            if (!isset($latestWeekMemosIndexed[$i])) {
-                $templateProcessor->setValue("memo_date_$i", '');
+            if (!isset($latest_week_memos_indexed[$i])) {
+                $template_processor->setValue("memo_date_$i", '');
                 for ($j = 0; $j < 5; $j++) {
-                    $templateProcessor->setValue("memo[$j]_$i", '……………………………………………………………………………………');
+                    $template_processor->setValue("memo[$j]_$i", '……………………………………………………………………………………');
                 }
-                $templateProcessor->setValue("note_today_$i", '');
+                $template_processor->setValue("note_today_$i", '');
             } else {
-                $memo = $latestWeekMemosIndexed[$i];
-                $thaiDate = $this->formatThaiDate($memo->memo_date);
-                $templateProcessor->setValue("number_of_week", $currentWeekNumber);
-                $templateProcessor->setValue("memo_date_$i", $thaiDate);
+                $memo = $latest_week_memos_indexed[$i];
+                $thai_date = $this->formatThaiDate($memo->memo_date);
+                $template_processor->setValue("number_of_week", $current_week_number);
+                $template_processor->setValue("memo_date_$i", $thai_date);
                 for ($j = 0; $j < 5; $j++) {
-                    $templateProcessor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
+                    $template_processor->setValue("memo[$j]_$i", $this->getMemo($memo->memo, $j));
                 }
-                $templateProcessor->setValue("note_today_$i", $memo->note_today);
+                $template_processor->setValue("note_today_$i", $memo->note_today);
             }
         }
-        $fileName = $userInfo['student_id'] . '_week' . $currentWeekNumber . '_memo.docx';
-        $filePath = public_path($directory . DIRECTORY_SEPARATOR . $fileName);
-        $templateProcessor->saveAs($filePath);
-        return $filePath;
+        $file_name = $user_info['student_id'] . '_week' . $current_week_number . '_memo.docx';
+        $file_path = public_path($directory . DIRECTORY_SEPARATOR . $file_name);
+        $template_processor->saveAs($file_path);
+        return $file_path;
     }
     private function formatThaiDate($date)
     {
-        $thaiMonths = [
+        $thai_months = [
             '01' => 'ม.ค.',
             '02' => 'ก.พ.',
             '03' => 'มี.ค.',
@@ -963,7 +963,7 @@ class TelegramController extends Controller
         $month = date('m', strtotime($date));
         $day = date('d', strtotime($date));
 
-        return "$day {$thaiMonths[$month]} $year";
+        return "$day {$thai_months[$month]} $year";
     }
 
     //function_setinfo
@@ -1041,7 +1041,7 @@ class TelegramController extends Controller
             cache()->forget("chat_id_{$chat_id}_user_info");
             cache()->forget("chat_id_{$chat_id}_start_set_info");
         } else {
-            app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+            app('telegram_bot')->sendMessage($chat_id, "/setinfo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
     }
     public function saveUserInfo(array $user_info, $chat_id)
@@ -1147,7 +1147,7 @@ class TelegramController extends Controller
             app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /setreminder");
             cache()->forget("chat_id_{$chat_id}_set_reminder");
         } else {
-            app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+            app('telegram_bot')->sendMessage($chat_id, "/setreminder กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
     }
 
@@ -1185,7 +1185,7 @@ class TelegramController extends Controller
             app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /editreminder");
             cache()->forget("chat_id_{$chat_id}_edit_reminder");
         } else {
-            app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+            app('telegram_bot')->sendMessage($chat_id, "/editreminder กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
     }
     //memo
