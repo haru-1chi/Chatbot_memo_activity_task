@@ -157,7 +157,7 @@ class TelegramController extends Controller
                 ];
                 $text = "ข้อมูลที่แก้ไขใหม่\n";
                 $text .= "{$column_name[$select]}: {$current_memo}\n";
-                $text .= "ถูกต้องไหมคะ?\n(กรุณาตอบ yes หรือ /cancel)";
+                $text .= "ถูกต้องไหมคะ?\n(กรุณาตอบ /yes หรือ /cancel)";
                 app('telegram_bot')->sendMessage($chat_id, $text);
                 cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_time', now()->addMinutes(60));
             } elseif ($step === 'waiting_for_time') {
@@ -259,7 +259,7 @@ class TelegramController extends Controller
                     if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
                         $text = "ให้แจ้งเตือนเริ่มจดบันทึกงานประจำวันในเวลา\n";
                         $text .= "{$time} น. ใช่ไหมคะ?\n";
-                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
                         cache()->put("chat_id_{$chat_id}_start_set_reminder", 'confirm', now()->addMinutes(60));
@@ -274,7 +274,7 @@ class TelegramController extends Controller
                     if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
                         $text = "ให้แจ้งเตือนสรุปงานประจำวันในเวลา\n";
                         $text .= "{$time} น. ใช่ไหมคะ?\n";
-                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
                         cache()->put("chat_id_{$chat_id}_start_set_reminder", 'confirm', now()->addMinutes(60));
@@ -370,7 +370,7 @@ class TelegramController extends Controller
                     if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
                         $text = "ให้แจ้งเตือนเริ่มจดบันทึกงานประจำวันในเวลา\n";
                         $text .= "{$time} น. ใช่ไหมคะ?\n";
-                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
                         cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'confirm', now()->addMinutes(60));
@@ -385,7 +385,7 @@ class TelegramController extends Controller
                     if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
                         $text = "ให้แจ้งเตือนสรุปงานประจำวันในเวลา\n";
                         $text .= "{$time} น. ใช่ไหมคะ?\n";
-                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
                         cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'confirm', now()->addMinutes(60));
@@ -499,7 +499,7 @@ class TelegramController extends Controller
                             $formatted_memo[] = ($key + 1) . ". " . $memo;
                         }
                         $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
-                        $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
+                        $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ /yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
@@ -627,7 +627,7 @@ class TelegramController extends Controller
                             $formatted_memo[] = ($key + 1) . ". " . $memo;
                         }
                         $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
-                        $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
+                        $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ /yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
@@ -714,7 +714,7 @@ class TelegramController extends Controller
                     $formatted_memo[] = ($key + 1) . ". " . $memo;
                 }
                 $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
-                $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
+                $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ /yes หรือ /cancel)\n";
                 app('telegram_bot')->sendMessage($chat_id, $text);
                 cache()->put("chat_id_{$chat_id}_start_edit_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
             } elseif ($step === 'waiting_for_time') {
@@ -764,7 +764,7 @@ class TelegramController extends Controller
                     }
                     $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
                     $text .= "\nคุณต้องการล้างบันทึกประจำวันเพื่อเริ่มจดบันทึกใหม่หรือไม่?";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                    $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                     cache()->put("chat_id_{$chat_id}_start_reset_memo_dairy", true, now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
@@ -805,7 +805,7 @@ class TelegramController extends Controller
                 if ($user_memo['note_today']) {
                     $text = "หมายเหตุประจำวันตอนนี้:\n{$user_memo['note_today']}";
                     $text .= "\nคุณต้องการล้างหมายเหตุประจำวันเพื่อเริ่มจดบันทึกใหม่หรือไม่?";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                    $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                     cache()->put("chat_id_{$chat_id}_start_reset_notetoday", true, now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
@@ -877,7 +877,7 @@ class TelegramController extends Controller
 
                 $text = "หมายเหตุของวันนี้:\n";
                 $text .= "{$note_today}\nถูกต้องมั้ยคะ?";
-                $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                $text .= "(กรุณาตอบ /yes หรือ /cancel)\n";
                 cache()->put("chat_id_{$chat_id}_start_notetoday", 'confirm', now()->addMinutes(60));
                 cache()->put("chat_id_{$chat_id}_notetoday", $note_today, now()->addMinutes(60));
                 $result = app('telegram_bot')->sendMessage($chat_id, $text);
@@ -1124,7 +1124,7 @@ class TelegramController extends Controller
             $text .= "เบอร์โทรศัพท์: $phone_number\n";
             $text .= "สาขาวิชา: $branch\n";
             $text .= "สถานประกอบการ: $company\n";
-            $text .= "ถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)";
+            $text .= "ถูกต้องมั้ยคะ? (กรุณาตอบ /yes หรือ /cancel)";
 
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
@@ -1150,7 +1150,7 @@ class TelegramController extends Controller
         $cancel_message,
         $update_callback = null
     ) {
-        $confirmation_text = 'yes';
+        $confirmation_text = '/yes';
         $text = $request->message['text'];
 
         if ($text === $confirmation_text) {
@@ -1165,7 +1165,7 @@ class TelegramController extends Controller
                 cache()->forget($cacheKey);
             }
         } else {
-            app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+            app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย '/yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
     }
     public function saveUserInfo(array $user_info, $chat_id)
