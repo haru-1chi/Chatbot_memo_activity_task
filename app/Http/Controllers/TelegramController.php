@@ -1087,7 +1087,6 @@ class TelegramController extends Controller
     ) {
         $confirmation_text = 'yes';
         $text = $request->message['text'];
-        foreach ($cache_keys as $cache_key) {
             if ($text === $confirmation_text) {
                 if ($update_callback && is_callable($update_callback)) {
                     $update_callback();
@@ -1103,7 +1102,6 @@ class TelegramController extends Controller
             } else {
                 app('telegram_bot')->sendMessage("กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ", $chat_id, $reply_to_message);
             }
-        }
     }
     public function saveUserInfo(array $user_info, $chat_id)
     {
