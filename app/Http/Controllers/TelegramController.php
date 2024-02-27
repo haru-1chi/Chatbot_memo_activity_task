@@ -16,16 +16,24 @@ use App\Services\TelegramBot;
 
 class TelegramController extends Controller
 {
-    protected $telegramBotService;
+    protected $telegram_bot_service;
 
-    public function __construct(TelegramBot $telegramBotService)
+    public function __construct(TelegramBot $telegram_bot_service)
     {
-        $this->telegramBotService = $telegramBotService;
+        $this->telegram_bot_service = $telegram_bot_service;
     }
     public function inbound(Request $request)
     {
         Log::channel('null')->info('Skipping logging for inbound message');
         $chat_id = $request->message['from']['id'] ?? null;
+
+        if ($request->message['text'] === '/cancel') {
+            Cache::flush();
+            // cache()->forget("chat_id_{$chat_id}_start_set_info");
+            // cache()->forget("chat_id_{$chat_id}_start_edit_info");
+            app('telegram_bot')->sendMessage($chat_id, "ยกเลิกคำสั่งปัจจุบันเรียบร้อยแล้ว");
+            return;
+        }
 
         if ($request->message['text'] === '/start' || $request->message['text'] === '/help') {
             $chat_id = $request->message['from']['id'];
@@ -58,29 +66,29 @@ class TelegramController extends Controller
         }
         //setinfo
         if ($request->message['text'] === '/setinfo') {
-            return $this->handleSetInfoCommand($chat_id);
+            return $this->setInfoForm($chat_id);
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startSetInfo")) {
-            $step = cache()->get("chat_id_{$chat_id}_startSetInfo");
+        if (cache()->has("chat_id_{$chat_id}_start_set_info")) {
+            $step = cache()->get("chat_id_{$chat_id}_start_set_info");
             if ($step === 'waiting_for_command') {
-                return $this->handleUserInfoInput($chat_id, $request);
+                return $this->showSetInfoForm($chat_id, $request);
             } elseif ($step === 'confirm') {
                 return $this->handleConfirmation($chat_id, $request);
             }
         }
         //editinfo
         if ($request->message['text'] === '/editinfo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 $text = "ต้องการแก้ไขข้อมูลใด:\n";
-                $text .= "1. ชื่อ-นามสกุล: {$userInfo['name']}\n";
-                $text .= "2. รหัสนิสิต: {$userInfo['student_id']}\n";
-                $text .= "3. เบอร์โทรศัพท์: {$userInfo['phone_number']}\n";
-                $text .= "4. สาขาวิชา: {$userInfo['branch']}\n";
-                $text .= "5. สถานประกอบการ: {$userInfo['company']}\n";
+                $text .= "1. ชื่อ-นามสกุล: {$user_info['name']}\n";
+                $text .= "2. รหัสนิสิต: {$user_info['student_id']}\n";
+                $text .= "3. เบอร์โทรศัพท์: {$user_info['phone_number']}\n";
+                $text .= "4. สาขาวิชา: {$user_info['branch']}\n";
+                $text .= "5. สถานประกอบการ: {$user_info['company']}\n";
                 $text .= "กรุณาตอบเป็นตัวเลข(1-5)";
-                cache()->put("chat_id_{$chat_id}_startEdit_userinfo", 'waiting_for_command', now()->addMinutes(60));
+                cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_command', now()->addMinutes(60));
                 $result = app('telegram_bot')->sendMessage($chat_id, $text);
                 return response()->json($result, 200);
             } else {
@@ -91,14 +99,14 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startEdit_userinfo")) {
-            $step = cache()->get("chat_id_{$chat_id}_startEdit_userinfo");
+        if (cache()->has("chat_id_{$chat_id}_start_edit_info")) {
+            $step = cache()->get("chat_id_{$chat_id}_start_edit_info");
             $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
-            $userInfo = $this->getUserInfo($chat_id);
+            $user_info = $this->getUserInfo($chat_id);
             if ($step === 'waiting_for_command') {
-                $selectedIndex = (int) $request->message['text'];
-                if ($userInfo && is_array($userInfo->toArray()) && $selectedIndex >= 1 && $selectedIndex <= 5) {
-                    $columnName = [
+                $selected_index = (int) $request->message['text'];
+                if ($user_info && is_array($user_info->toArray()) && $selected_index >= 1 && $selected_index <= 5) {
+                    $column_name = [
                         1 => 'ชื่อ-นามสกุล',
                         2 => 'รหัสนิสิต',
                         3 => 'เบอร์โทรศัพท์',
@@ -106,19 +114,22 @@ class TelegramController extends Controller
                         5 => 'สถานประกอบการ'
                     ];
                     $text = "กรุณากรอกข้อมูลดังกล่าวใหม่\n";
-                    $text .= "1. {$columnName[$selectedIndex]}\n";
-                    cache()->put("chat_id_{$chat_id}_startEdit_userinfo", 'updated', now()->addMinutes(60));
-                    cache()->put("chat_id_{$chat_id}_select_choice_edit", $selectedIndex, now()->addMinutes(60));
+                    $text .= "$selected_index. {$column_name[$selected_index]}\n";
+                    cache()->put("chat_id_{$chat_id}_start_edit_info", 'updated', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_select_choice_edit", $selected_index, now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
+                } else {
+                    $text = "กรุณาตอบเป็นตัวเลข(1-5)เท่านั้น";
+                    app('telegram_bot')->sendMessage($chat_id, $text);
                 }
             } elseif ($step === 'updated') {
                 $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
-                $memoMessages = $request->message['text'];
-                cache()->put("chat_id_{$chat_id}_edit_userInfo", $memoMessages, now()->addMinutes(60));
-                $currentMemo = cache()->get("chat_id_{$chat_id}_edit_userInfo");
-                $columnName = [
+                $memo_messages = $request->message['text'];
+                cache()->put("chat_id_{$chat_id}_edit_user_info", $memo_messages, now()->addMinutes(60));
+                $current_memo = cache()->get("chat_id_{$chat_id}_edit_user_info");
+                $column_name = [
                     1 => 'ชื่อ-นามสกุล',
                     2 => 'รหัสนิสิต',
                     3 => 'เบอร์โทรศัพท์',
@@ -126,18 +137,18 @@ class TelegramController extends Controller
                     5 => 'สถานประกอบการ'
                 ];
                 $text = "ข้อมูลที่แก้ไขใหม่\n";
-                $text .= "{$columnName[$select]}: {$currentMemo}\n";
+                $text .= "{$column_name[$select]}: {$current_memo}\n";
                 $text .= "ถูกต้องไหมคะ?\n(กรุณาตอบ yes หรือ /cancel)";
                 app('telegram_bot')->sendMessage($chat_id, $text);
-                cache()->put("chat_id_{$chat_id}_startEdit_userinfo", 'waiting_for_time', now()->addMinutes(60));
+                cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_time', now()->addMinutes(60));
             } elseif ($step === 'waiting_for_time') {
-                $confirmationText = 'yes';
+                $confirmation_text = 'yes';
                 $text = $request->message['text'];
-                $textUpdate = cache()->get("chat_id_{$chat_id}_edit_userInfo");
-                if ($text === $confirmationText) {
-                    $userInformation = cache()->get("chat_id_{$chat_id}_select_choice_edit");
-                    if ($userInformation) {
-                        $columnName = [
+                $text_update = cache()->get("chat_id_{$chat_id}_edit_user_info");
+                if ($text === $confirmation_text) {
+                    $user_info = cache()->get("chat_id_{$chat_id}_select_choice_edit");
+                    if ($user_info) {
+                        $column_name = [
                             1 => 'name',
                             2 => 'student_id',
                             3 => 'phone_number',
@@ -145,7 +156,7 @@ class TelegramController extends Controller
                             5 => 'company'
                         ];
                         User::where('telegram_chat_id', $chat_id)->update([
-                            $columnName[$userInformation] => $textUpdate
+                            $column_name[$user_info] => $text_update
                         ]);
                         app('telegram_bot')->sendMessage($chat_id, "แก้ไขข้อมูลเรียบร้อยแล้ว");
                         cache()->forget("chat_id_{$chat_id}_edit_user_info");
@@ -158,21 +169,21 @@ class TelegramController extends Controller
                 } else {
                     app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
-                cache()->forget("chat_id_{$chat_id}_edit_userInfo");
-                cache()->forget("chat_id_{$chat_id}_startEdit_userinfo");
+                cache()->forget("chat_id_{$chat_id}_edit_user_info");
+                cache()->forget("chat_id_{$chat_id}_start_edit_info");
                 cache()->forget("chat_id_{$chat_id}_select_choice_edit");
             }
         }
         //getinfo
         if ($request->message['text'] === '/getinfo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 $text = "ข้อมูลส่วนตัวของคุณ:\n";
-                $text .= "1. ชื่อ-นามสกุล: {$userInfo['name']}\n";
-                $text .= "2. รหัสนิสิต: {$userInfo['student_id']}\n";
-                $text .= "3. เบอร์โทรศัพท์: {$userInfo['phone_number']}\n";
-                $text .= "4. สาขาวิชา: {$userInfo['branch']}\n";
-                $text .= "5. สถานประกอบการ: {$userInfo['company']}\n";
+                $text .= "1. ชื่อ-นามสกุล: {$user_info['name']}\n";
+                $text .= "2. รหัสนิสิต: {$user_info['student_id']}\n";
+                $text .= "3. เบอร์โทรศัพท์: {$user_info['phone_number']}\n";
+                $text .= "4. สาขาวิชา: {$user_info['branch']}\n";
+                $text .= "5. สถานประกอบการ: {$user_info['company']}\n";
                 $text .= "หากต้องการแก้ไขข้อมูลส่วนตัว สามารถ /editinfo";
                 $result = app('telegram_bot')->sendMessage($chat_id, $text);
                 return response()->json($result, 200);
@@ -186,8 +197,8 @@ class TelegramController extends Controller
         }
         //setreminder
         if ($request->message['text'] === '/setreminder') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 return $this->setReminder($request);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
@@ -197,8 +208,8 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_setreminder")) {
-            $step = cache()->get("chat_id_{$chat_id}_setreminder");
+        if (cache()->has("chat_id_{$chat_id}_set_reminder")) {
+            $step = cache()->get("chat_id_{$chat_id}_set_reminder");
             $select = cache()->get("chat_id_{$chat_id}_select_type");
             if ($step === 'waiting_for_command') {
                 $message = $request->message['text'];
@@ -206,21 +217,22 @@ class TelegramController extends Controller
                     $text = "ต้องการให้แจ้งเตือนจดบันทึกงานประจำวันกี่โมง?\n";
                     $text .= "กรุณาตอบในรูปแบบนาฬิกา 24 ชั่วโมง\n";
                     $text .= "ยกตัวอย่าง <10:00>\n";
-                    cache()->put("chat_id_{$chat_id}_setreminder", 'waiting_for_time', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_set_reminder", 'waiting_for_time', now()->addMinutes(60));
                     cache()->put("chat_id_{$chat_id}_select_type", '/formemo', now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
-                }
-                if ($message === '/forsummary') {
+                } elseif ($message === '/forsummary') {
                     $text = "ต้องการให้แจ้งเตือนสรุปงานประจำวันกี่โมง?\n";
                     $text .= "กรุณาตอบในรูปแบบนาฬิกา 24 ชั่วโมง\n";
                     $text .= "ยกตัวอย่าง <10:00>\n";
-                    cache()->put("chat_id_{$chat_id}_setreminder", 'waiting_for_time', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_set_reminder", 'waiting_for_time', now()->addMinutes(60));
                     cache()->put("chat_id_{$chat_id}_select_type", '/forsummary', now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
-
                     return response()->json($result, 200);
+                } else {
+                    $text = "กรุณาเลือกระหว่าง /formemo หรือ /forsummary เท่านั้น";
+                    app('telegram_bot')->sendMessage($chat_id, $text);
                 }
             } elseif ($step === 'waiting_for_time') {
 
@@ -231,7 +243,7 @@ class TelegramController extends Controller
                     $text .= "{$time} น. ใช่ไหมคะ?\n";
                     $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_setreminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
                     cache()->forget("chat_id_{$chat_id}_select_type");
                     return response()->json($result, 200);
                 }
@@ -242,7 +254,7 @@ class TelegramController extends Controller
                     $text .= "{$time} น. ใช่ไหมคะ?\n";
                     $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_setreminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
                     cache()->forget("chat_id_{$chat_id}_select_type");
                     return response()->json($result, 200);
                 }
@@ -251,8 +263,8 @@ class TelegramController extends Controller
         }
         //editreminder
         if ($request->message['text'] === '/editreminder') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 return $this->editReminder($request);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
@@ -262,8 +274,8 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_editreminder")) {
-            $step = cache()->get("chat_id_{$chat_id}_editreminder");
+        if (cache()->has("chat_id_{$chat_id}_edit_reminder")) {
+            $step = cache()->get("chat_id_{$chat_id}_edit_reminder");
             $select = cache()->get("chat_id_{$chat_id}_select_type_edit");
             if ($step === 'waiting_for_command') {
                 $message = $request->message['text'];
@@ -271,21 +283,23 @@ class TelegramController extends Controller
                     $text = "ต้องการแก้ไขเวลาแจ้งเตือนจดบันทึกงานประจำวันกี่โมง?\n";
                     $text .= "กรุณาตอบในรูปแบบนาฬิกา 24 ชั่วโมง\n";
                     $text .= "ยกตัวอย่าง <10:00>\n";
-                    cache()->put("chat_id_{$chat_id}_editreminder", 'waiting_for_time', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_edit_reminder", 'waiting_for_time', now()->addMinutes(60));
                     cache()->put("chat_id_{$chat_id}_select_type_edit", '/formemo', now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
-                }
-                if ($message === '2') {
+                } elseif ($message === '2') {
                     $text = "ต้องการแก้ไขเวลาสรุปงานประจำวันกี่โมง?\n";
                     $text .= "กรุณาตอบในรูปแบบนาฬิกา 24 ชั่วโมง\n";
                     $text .= "ยกตัวอย่าง <10:00>\n";
-                    cache()->put("chat_id_{$chat_id}_editreminder", 'waiting_for_time', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_edit_reminder", 'waiting_for_time', now()->addMinutes(60));
                     cache()->put("chat_id_{$chat_id}_select_type_edit", '/forsummary', now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
+                } else {
+                    $text = "กรุณาตอบเป็นตัวเลข 1 หรือ 2 เท่านั้น";
+                    app('telegram_bot')->sendMessage($chat_id, $text);
                 }
             } elseif ($step === 'waiting_for_time') {
 
@@ -296,7 +310,7 @@ class TelegramController extends Controller
                     $text .= "{$time} น. ใช่ไหมคะ?\n";
                     $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_editreminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
                     cache()->forget("chat_id_{$chat_id}_select_type_edit");
                     return response()->json($result, 200);
                 }
@@ -307,7 +321,7 @@ class TelegramController extends Controller
                     $text .= "{$time} น. ใช่ไหมคะ?\n";
                     $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_editreminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
                     cache()->forget("chat_id_{$chat_id}_select_type_edit");
                     return response()->json($result, 200);
                 }
@@ -316,29 +330,27 @@ class TelegramController extends Controller
         }
         //getreminder
         if ($request->message['text'] === '/getreminder') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
-                $userInfo = $this->getReminder($chat_id);
-
-                if (!empty($userInfo['memo_time'] && $userInfo['summary_time'])) {
-                    $memoTime = Carbon::createFromFormat('H:i:s', $userInfo['memo_time'])->format('H:i');
-                    $summaryTime = Carbon::createFromFormat('H:i:s', $userInfo['summary_time'])->format('H:i');
-                    $text = "แจ้งเตือนการจดบันทึกประจำวันเวลา: {$memoTime} น.\n";
-                    $text .= "แจ้งเตือนสรุปงานประจำวันเวลา: {$summaryTime} น.\n";
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
+                if (!empty($user_info['memo_time'] && $user_info['summary_time'])) {
+                    $memo_time = Carbon::createFromFormat('H:i:s', $user_info['memo_time'])->format('H:i');
+                    $summary_time = Carbon::createFromFormat('H:i:s', $user_info['summary_time'])->format('H:i');
+                    $text = "แจ้งเตือนการจดบันทึกประจำวันเวลา: {$memo_time} น.\n";
+                    $text .= "แจ้งเตือนสรุปงานประจำวันเวลา: {$summary_time} น.\n";
                     $text .= "หากต้องการแก้ไข สามารถ /editreminder";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
-                } elseif (!empty($userInfo['memo_time']) && empty($userInfo['summary_time'])) {
-                    $memoTime = Carbon::createFromFormat('H:i:s', $userInfo['memo_time'])->format('H:i');
-                    $text = "แจ้งเตือนการจดบันทึกประจำวันเวลา: {$memoTime} น.\n";
+                } elseif (!empty($user_info['memo_time']) && empty($user_info['summary_time'])) {
+                    $memo_time = Carbon::createFromFormat('H:i:s', $user_info['memo_time'])->format('H:i');
+                    $text = "แจ้งเตือนการจดบันทึกประจำวันเวลา: {$memo_time} น.\n";
                     $text .= "คุณยังไม่ได้สรุปงานประจำวัน!\n";
                     $text .= "กรุณา /setreminder เพื่อตั้งค่าเวลาสรุปงานประจำวัน";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
-                } elseif (empty($userInfo['memo_time']) && !empty($userInfo['summary_time'])) {
-                    $summaryTime = Carbon::createFromFormat('H:i:s', $userInfo['summary_time'])->format('H:i');
+                } elseif (empty($user_info['memo_time']) && !empty($user_info['summary_time'])) {
+                    $summary_time = Carbon::createFromFormat('H:i:s', $user_info['summary_time'])->format('H:i');
                     $text = "คุณยังไม่ได้ตั้งค่าเวลาแจ้งเตือนจดบันทึกประจำวัน!\n";
-                    $text .= "แจ้งเตือนสรุปงานประจำวันเวลา: {$summaryTime} น.\n";
+                    $text .= "แจ้งเตือนสรุปงานประจำวันเวลา: {$summary_time} น.\n";
                     $text .= "กรุณา /setreminder เพื่อตั้งค่าเวลาจดบันทึกประจำวัน";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
@@ -358,8 +370,8 @@ class TelegramController extends Controller
         }
         //memo
         if ($request->message['text'] === '/memo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 return $this->memoDairy($request);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
@@ -369,45 +381,45 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startMemoDairy")) {
-            $step = cache()->get("chat_id_{$chat_id}_startMemoDairy");
+        if (cache()->has("chat_id_{$chat_id}_start_memo_dairy")) {
+            $step = cache()->get("chat_id_{$chat_id}_start_memo_dairy");
             if ($step === 'waiting_for_command') {
-                $memoMessage = $request->message['text'];
-                if ($memoMessage === '/end') {
-                    $currentMemo = cache()->get("chat_id_{$chat_id}_memoDaily");
-                    if ($currentMemo !== null) {
-                        $formattedMemo = [];
-                        foreach ($currentMemo as $key => $memo) {
-                            $formattedMemo[] = ($key + 1) . ". " . $memo;
+                $memo_message = $request->message['text'];
+                if ($memo_message === '/end') {
+                    $current_memo = cache()->get("chat_id_{$chat_id}_memo_daily"); //case null
+                    if ($current_memo !== null && !empty($current_memo)) {
+                        $formatted_memo = [];
+                        foreach ($current_memo as $key => $memo) {
+                            $formatted_memo[] = ($key + 1) . ". " . $memo;
                         }
-                        $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formattedMemo);
+                        $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
                         $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
-                        cache()->put("chat_id_{$chat_id}_startMemoDairy", 'waiting_for_time', now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
                         $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก";
                         app('telegram_bot')->sendMessage($chat_id, $text);
-                        cache()->put("chat_id_{$chat_id}_startMemoDairy", 'waiting_for_command', now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
                     }
                 } else {
-                    $memoMessages = cache()->get("chat_id_{$chat_id}_memoDaily", []);
-                    $memoMessages[] = $memoMessage;
-                    cache()->put("chat_id_{$chat_id}_memoDaily", $memoMessages, now()->addMinutes(60));
+                    $memo_messages = cache()->get("chat_id_{$chat_id}_memo_daily", []);
+                    $memo_messages[] = $memo_message;
+                    cache()->put("chat_id_{$chat_id}_memo_daily", $memo_messages, now()->addMinutes(60));
                 }
             } elseif ($step === 'waiting_for_time') {
-                $confirmationText = 'yes';
+                $confirmation_text = 'yes';
                 $text_reply = '';
                 $text = $request->message['text'];
-                if ($text === $confirmationText) {
-                    $currentMemo = cache()->get("chat_id_{$chat_id}_memoDaily");
-                    $currentTime = Carbon::now()->toDateString();
-                    if ($currentMemo && Memo::where('user_id', $chat_id)->whereDate('memo_date', $currentTime)->exists()) {
-                        $formattedMemo = implode(', ', $currentMemo);
-                        Memo::where('user_id', $chat_id)->where('memo_date', $currentTime)->update(['memo' => $formattedMemo]);
+                if ($text === $confirmation_text) {
+                    $current_memo = cache()->get("chat_id_{$chat_id}_memo_daily");
+                    $current_time = Carbon::now()->toDateString();
+                    if ($current_memo && Memo::where('user_id', $chat_id)->whereDate('memo_date', $current_time)->exists()) {
+                        $formatted_memo = implode(', ', $current_memo);
+                        Memo::where('user_id', $chat_id)->where('memo_date', $current_time)->update(['memo' => $formatted_memo]);
                         $text_reply = "บันทึกงานประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
-                    } elseif ($currentMemo) {
-                        $formattedMemo = implode(', ', $currentMemo);
-                        Memo::create(['user_id' => $chat_id, 'memo' => $formattedMemo, 'memo_date' => $currentTime]);
+                    } elseif ($current_memo) {
+                        $formatted_memo = implode(', ', $current_memo);
+                        Memo::create(['user_id' => $chat_id, 'memo' => $formatted_memo, 'memo_date' => $current_time]);
 
                         $text_reply = "บันทึกงานประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
                     } else {
@@ -420,33 +432,33 @@ class TelegramController extends Controller
                 } else {
                     app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
-                cache()->forget("chat_id_{$chat_id}_startMemoDairy");
-                cache()->forget("chat_id_{$chat_id}_memoDaily");
+                cache()->forget("chat_id_{$chat_id}_start_memo_dairy");
+                cache()->forget("chat_id_{$chat_id}_memo_daily");
             }
         }
         //getmemo
         if ($request->message['text'] === '/getmemo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
 
-                $userMemo = $this->getUserMemo($chat_id);
-                if (!$userMemo || (!$userMemo['memo'] && !$userMemo['note_today'])) {
+                $user_memo = $this->getUserMemo($chat_id);
+                if (!$user_memo || (!$user_memo['memo'] && !$user_memo['note_today'])) {
 
                     $text = "คุณยังไม่ได้จดบันทึกงานประจำวัน!\n";
                     $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
-                } elseif ($userMemo['memo']) {
+                } elseif ($user_memo['memo']) {
 
-                    $memoArray = explode(', ', $userMemo['memo']);
-                    $formattedMemo = [];
-                    foreach ($memoArray as $key => $memo) {
-                        $formattedMemo[] = ($key + 1) . ". " . $memo;
+                    $memo_array = explode(', ', $user_memo['memo']);
+                    $formatted_memo = [];
+                    foreach ($memo_array as $key => $memo) {
+                        $formatted_memo[] = ($key + 1) . ". " . $memo;
                     }
-                    $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formattedMemo);
-                    if ($userMemo['note_today']) {
-                        $text .= "\n\nหมายเหตุประจำวัน:\n{$userMemo['note_today']}";
+                    $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
+                    if ($user_memo['note_today']) {
+                        $text .= "\n\nหมายเหตุประจำวัน:\n{$user_memo['note_today']}";
                     }
                     $text .= "\n\nหรือคุณต้องการ\n";
                     $text .= "   /addmemo - เพิ่มบันทึกงานประจำวัน\n";
@@ -458,8 +470,8 @@ class TelegramController extends Controller
                     $text .= "   /resetnotetoday - ล้างหมายเหตุประจำวัน\n\n";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
-                } elseif ($userMemo['note_today'] && empty($userMemo['memo'])) {
-                    $text = "หมายเหตุประจำวัน:\n{$userMemo['note_today']}";
+                } elseif ($user_memo['note_today'] && empty($user_memo['memo'])) {
+                    $text = "หมายเหตุประจำวัน:\n{$user_memo['note_today']}";
                     $text .= "\n\nหรือคุณต้องการ\n";
                     $text .= "   /memo - เริ่มจดบันทึกงานประจำวัน\n";
                     $text .= "   /addmemo - เพิ่มบันทึกงานประจำวัน\n";
@@ -481,8 +493,8 @@ class TelegramController extends Controller
         }
         //addmemo
         if ($request->message['text'] === '/addmemo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 return $this->addMemoDairy($request);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
@@ -492,44 +504,44 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startAddMemoDairy")) {
-            $step = cache()->get("chat_id_{$chat_id}_startAddMemoDairy");
+        if (cache()->has("chat_id_{$chat_id}_start_add_memo_dairy")) {
+            $step = cache()->get("chat_id_{$chat_id}_start_add_memo_dairy");
             if ($step === 'waiting_for_command') {
-                $memoMessage = $request->message['text'];
-                $userMemo = $this->getUserMemo($chat_id);
-                $memoArray = explode(', ', $userMemo['memo']);
-                if ($memoMessage === '/end') {
-                    $currentMemo = cache()->get("chat_id_{$chat_id}_addMemoDaily"); //case null
-                    if ($currentMemo !== null) {
-                        $formattedMemo = [];
-                        foreach ($currentMemo as $key => $memo) {
-                            $formattedMemo[] = ($key + 1) . ". " . $memo;
+                $memo_message = $request->message['text'];
+                $user_memo = $this->getUserMemo($chat_id);
+                $memo_array = explode(', ', $user_memo['memo']);
+                if ($memo_message === '/end') {
+                    $current_memo = cache()->get("chat_id_{$chat_id}_add_memo_daily"); //case null
+                    if ($current_memo !== null) {
+                        $formatted_memo = [];
+                        foreach ($current_memo as $key => $memo) {
+                            $formatted_memo[] = ($key + 1) . ". " . $memo;
                         }
-                        $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formattedMemo);
+                        $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
                         $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
                         app('telegram_bot')->sendMessage($chat_id, $text);
-                        cache()->put("chat_id_{$chat_id}_startAddMemoDairy", 'waiting_for_time', now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
                         $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก";
                         app('telegram_bot')->sendMessage($chat_id, $text);
-                        cache()->put("chat_id_{$chat_id}_startAddMemoDairy", 'waiting_for_command', now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
                     }
                 } else {
-                    $memoArray = cache()->get("chat_id_{$chat_id}_addMemoDaily", $memoArray);
-                    $memoArray[] = $memoMessage;
-                    cache()->put("chat_id_{$chat_id}_addMemoDaily", $memoArray, now()->addMinutes(60));
+                    $memo_array = cache()->get("chat_id_{$chat_id}_add_memo_daily", $memo_array);
+                    $memo_array[] = $memo_message;
+                    cache()->put("chat_id_{$chat_id}_add_memo_daily", $memo_array, now()->addMinutes(60));
                 }
             } elseif ($step === 'waiting_for_time') {
-                $confirmationText = 'yes';
+                $confirmation_text = 'yes';
                 $text_reply = '';
                 $text = $request->message['text'];
-                if ($text === $confirmationText) {
-                    $currentMemo = cache()->get("chat_id_{$chat_id}_addMemoDaily");
+                if ($text === $confirmation_text) {
+                    $current_memo = cache()->get("chat_id_{$chat_id}_add_memo_daily");
 
-                    if (!empty($currentMemo)) {
-                        $formattedMemo = implode(', ', $currentMemo);
-                        $currentDate = Carbon::now()->toDateString();
-                        Memo::where('user_id', $chat_id)->where('memo_date', $currentDate)->update(['memo' => $formattedMemo,]);
+                    if (!empty($current_memo)) {
+                        $formatted_memo = implode(', ', $current_memo);
+                        $current_date = Carbon::now()->toDateString();
+                        Memo::where('user_id', $chat_id)->where('memo_date', $current_date)->update(['memo' => $formatted_memo,]);
                         $text_reply = "บันทึกงานประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
                     } else {
                         $text_reply = "ไม่มีงานประจำวันที่จะบันทึกในขณะนี้ค่ะ!";
@@ -541,14 +553,14 @@ class TelegramController extends Controller
                 } else {
                     app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
-                cache()->forget("chat_id_{$chat_id}_startAddMemoDairy");
-                cache()->forget("chat_id_{$chat_id}_addMemoDaily");
+                cache()->forget("chat_id_{$chat_id}_start_add_memo_dairy");
+                cache()->forget("chat_id_{$chat_id}_add_memo_daily");
             }
         }
         //editmemo
         if ($request->message['text'] === '/editmemo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
                 return $this->editMemoDairy($request);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
@@ -558,48 +570,52 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_editMemoDairy")) {
-            $step = cache()->get("chat_id_{$chat_id}_editMemoDairy");
-            $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
-            $userMemo = $this->getUserMemo($chat_id);
-            $memoMessages = explode(', ', $userMemo['memo']);
+        if (cache()->has("chat_id_{$chat_id}_start_edit_memo_dairy")) {
+            $step = cache()->get("chat_id_{$chat_id}_start_edit_memo_dairy");
+            $select = cache()->get("chat_id_{$chat_id}_select_choice_edit_memo");
+            $user_memo = $this->getUserMemo($chat_id);
+            $memo_messages = explode(', ', $user_memo['memo']);
 
             if ($step === 'waiting_for_command') {
-                $selectedIndex = $request->message['text'];
-                if ($selectedIndex >= 1 && $selectedIndex <= count($memoMessages)) {
+                $selected_index = $request->message['text'];
+                if ($selected_index >= 1 && $selected_index <= count($memo_messages)) {
                     $text = "สามารถพิมพ์ข้อความเพื่อแก้ไขงานประจำวันได้เลยค่ะ\n";
                     $text .= "(สามารถแก้ไขได้เพียงข้อที่เลือก)\n";
                     $text .= "'Create function CRUD'\n";
-                    cache()->put("chat_id_{$chat_id}_editMemoDairy", 'updated', now()->addMinutes(60));
-                    cache()->put("chat_id_{$chat_id}_select_choice_edit", $selectedIndex, now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_start_edit_memo_dairy", 'updated', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_select_choice_edit_memo", $selected_index, now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
                     return response()->json($result, 200);
+                } else {
+                    $number_of_memo_massages = count($memo_messages);
+                    $text = "กรุณาตอบเป็นตัวเลข 1-$number_of_memo_massages เท่านั้น";
+                    app('telegram_bot')->sendMessage($chat_id, $text);
                 }
             } elseif ($step === 'updated') {
-                $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
-                $memoMessages[$select - 1] = $request->message['text'];
-                cache()->put("chat_id_{$chat_id}_memoDaily", $memoMessages, now()->addMinutes(60));
-                $currentMemo = cache()->get("chat_id_{$chat_id}_memoDaily");
-                $formattedMemo = [];
-                foreach ($currentMemo as $key => $memo) {
-                    $formattedMemo[] = ($key + 1) . ". " . $memo;
+                $select = cache()->get("chat_id_{$chat_id}_select_choice_edit_memo");
+                $memo_messages[$select - 1] = $request->message['text'];
+                cache()->put("chat_id_{$chat_id}_edit_memo_dairy", $memo_messages, now()->addMinutes(60));
+                $current_memo = cache()->get("chat_id_{$chat_id}_edit_memo_dairy");
+                $formatted_memo = [];
+                foreach ($current_memo as $key => $memo) {
+                    $formatted_memo[] = ($key + 1) . ". " . $memo;
                 }
-                $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formattedMemo);
+                $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
                 $text .= "\nถูกต้องมั้ยคะ? (กรุณาตอบ yes หรือ /cancel)\n";
                 app('telegram_bot')->sendMessage($chat_id, $text);
-                cache()->put("chat_id_{$chat_id}_editMemoDairy", 'waiting_for_time', now()->addMinutes(60));
+                cache()->put("chat_id_{$chat_id}_start_edit_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
             } elseif ($step === 'waiting_for_time') {
-                $confirmationText = 'yes';
+                $confirmation_text = 'yes';
                 $text_reply = '';
                 $text = $request->message['text'];
-                if ($text === $confirmationText) {
-                    $currentMemo = cache()->get("chat_id_{$chat_id}_memoDaily");
+                if ($text === $confirmation_text) {
+                    $current_memo = cache()->get("chat_id_{$chat_id}_edit_memo_dairy");
 
-                    if (!empty($currentMemo)) {
-                        $formattedMemo = implode(', ', $currentMemo);
-                        $currentDate = Carbon::now()->toDateString();
-                        Memo::where('user_id', $chat_id)->where('memo_date', $currentDate)->update(['memo' => $formattedMemo,]);
+                    if (!empty($current_memo)) {
+                        $formatted_memo = implode(', ', $current_memo);
+                        $current_date = Carbon::now()->toDateString();
+                        Memo::where('user_id', $chat_id)->where('memo_date', $current_date)->update(['memo' => $formatted_memo,]);
                         $text_reply = "บันทึกงานประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
                     } else {
                         $text_reply = "ไม่มีงานประจำวันที่จะบันทึกในขณะนี้ค่ะ!";
@@ -611,31 +627,31 @@ class TelegramController extends Controller
                 } else {
                     app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
-                cache()->forget("chat_id_{$chat_id}_memoDaily");
-                cache()->forget("chat_id_{$chat_id}_editMemoDairy");
-                cache()->forget("chat_id_{$chat_id}_select_choice_edit");
+                cache()->forget("chat_id_{$chat_id}_edit_memo_dairy");
+                cache()->forget("chat_id_{$chat_id}_start_edit_memo_dairy");
+                cache()->forget("chat_id_{$chat_id}_select_choice_edit_memo");
             }
         }
         //resetmemo
         if ($request->message['text'] === '/resetmemo') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
-                $userMemo = $this->getUserMemo($chat_id);
-                if ($userMemo['memo']) {
-                    $memoArray = explode(', ', $userMemo['memo']);
-                    $formattedMemo = [];
-                    foreach ($memoArray as $key => $memo) {
-                        $formattedMemo[] = ($key + 1) . ". " . $memo;
-                    }
-                    $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formattedMemo);
-                    $text .= "\nคุณต้องการล้างบันทึกประจำวันเพื่อเริ่มจดบันทึกใหม่หรือไม่?";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                    cache()->put("chat_id_{$chat_id}_startResetMemoDairy", true, now()->addMinutes(60));
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
+                $user_memo = $this->getUserMemo($chat_id);
+                if (!$user_memo || !$user_memo['memo'] || (!$user_memo['memo'] && !$user_memo['note_today'])) {
+                    $text = "คุณยังไม่ได้จดบันทึกงานประจำวัน!\n";
+                    $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
                 } else {
-                    $text = "คุณยังไม่ได้จดบันทึกงานประจำวัน!\n";
-                    $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน";
+                    $memo_array = explode(', ', $user_memo['memo']);
+                    $formatted_memo = [];
+                    foreach ($memo_array as $key => $memo) {
+                        $formatted_memo[] = ($key + 1) . ". " . $memo;
+                    }
+                    $text = "งานที่บันทึกในตอนนี้:\n" . implode("\n", $formatted_memo);
+                    $text .= "\nคุณต้องการล้างบันทึกประจำวันเพื่อเริ่มจดบันทึกใหม่หรือไม่?";
+                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                    cache()->put("chat_id_{$chat_id}_start_reset_memo_dairy", true, now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
                 }
@@ -647,14 +663,14 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startResetMemoDairy")) {
-            $confirmationText = 'yes';
+        if (cache()->has("chat_id_{$chat_id}_start_reset_memo_dairy")) {
+            $confirmation_text = 'yes';
             $text_reply = '';
             $text = $request->message['text'];
-            $userMemo = $this->getUserMemo($chat_id);
-            if ($text === $confirmationText) {
-                $userMemo->memo = null;
-                $userMemo->save();
+            $user_memo = $this->getUserMemo($chat_id);
+            if ($text === $confirmation_text) {
+                $user_memo->memo = null;
+                $user_memo->save();
                 $text_reply = "ล้างบันทึกงานประจำวันเรียบร้อยแล้ว!\n";
                 $text_reply .= "สามารถ /memo เพื่อเริ่มจดบันทึกประจำวันใหม่อีกครั้ง";
                 app('telegram_bot')->sendMessage($chat_id, $text_reply);
@@ -663,21 +679,21 @@ class TelegramController extends Controller
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
             }
-            cache()->forget("chat_id_{$chat_id}_startResetMemoDairy");
+            cache()->forget("chat_id_{$chat_id}_start_reset_memo_dairy");
         }
         //resetnotetoday
         if ($request->message['text'] === '/resetnotetoday') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
-                $userMemo = $this->getUserMemo($chat_id);//check ว่า ถ้าไม่เคยบันทึกเลยในวันนี้
-                if ($userMemo['note_today']) {
-                    $text = "หมายเหตุประจำวันตอนนี้:\n{$userMemo['note_today']}";
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
+                $user_memo = $this->getUserMemo($chat_id);//check ว่า ถ้าไม่เคยบันทึกเลยในวันนี้
+                if ($user_memo['note_today']) {
+                    $text = "หมายเหตุประจำวันตอนนี้:\n{$user_memo['note_today']}";
                     $text .= "\nคุณต้องการล้างหมายเหตุประจำวันเพื่อเริ่มจดบันทึกใหม่หรือไม่?";
                     $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                    cache()->put("chat_id_{$chat_id}_startResetnotetoday", true, now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_start_reset_notetoday", true, now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
-                } elseif (!$userMemo['note_today']) {
+                } elseif (!$user_memo['note_today']) {
                     $text = "คุณยังไม่ได้เพิ่มหมายเหตุประจำวัน!\n";
                     $text .= "กรุณา /notetoday เพิ่มหมายเหตุประจำวัน";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
@@ -691,14 +707,14 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startResetnotetoday")) {
-            $confirmationText = 'yes';
+        if (cache()->has("chat_id_{$chat_id}_start_reset_notetoday")) {
+            $confirmation_text = 'yes';
             $text_reply = '';
             $text = $request->message['text'];
-            $userMemo = $this->getUserMemo($chat_id);
-            if ($text === $confirmationText) {
-                $userMemo->note_today = null;
-                $userMemo->save();
+            $user_memo = $this->getUserMemo($chat_id);
+            if ($text === $confirmation_text) {
+                $user_memo->note_today = null;
+                $user_memo->save();
                 $text_reply = "ล้างหมายเหตุประจำวันเรียบร้อยแล้ว!\n";
                 $text_reply .= "สามารถ /notetoday เพื่อเริ่มจดบันทึกประจำวันใหม่อีกครั้ง";
                 app('telegram_bot')->sendMessage($chat_id, $text_reply);
@@ -707,17 +723,17 @@ class TelegramController extends Controller
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
             }
-            cache()->forget("chat_id_{$chat_id}_startResetnotetoday");
+            cache()->forget("chat_id_{$chat_id}_start_reset_notetoday");
         }
         //notetoday
         if ($request->message['text'] === '/notetoday') {
-            $userInfo = $this->getUserInfo($chat_id);
-            if ($userInfo) {
-                $userMemo = $this->getUserMemo($chat_id);
-                if (!$userMemo || !$userMemo['note_today']) {
+            $user_info = $this->getUserInfo($chat_id);
+            if ($user_info) {
+                $user_memo = $this->getUserMemo($chat_id);
+                if (!$user_memo || !$user_memo['note_today']) {
                     $text = "สามารถพิมพ์ข้อความใดๆเพื่อเพิ่มหมายเหตุได้เลยค่ะ\n";
                     $text .= "ยกตัวอย่าง ‘วันหยุดปีใหม่’\n";
-                    cache()->put("chat_id_{$chat_id}_startNoteMemoDairy", 'waiting_for_command', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_start_notetoday", 'waiting_for_command', now()->addMinutes(60));
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
                 } else {
@@ -736,32 +752,31 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_startNoteMemoDairy")) {
-            $step = cache()->get("chat_id_{$chat_id}_startNoteMemoDairy");
+        if (cache()->has("chat_id_{$chat_id}_start_notetoday")) {
+            $step = cache()->get("chat_id_{$chat_id}_start_notetoday");
             if ($step === 'waiting_for_command') {
-                $notetoday = $request->message['text'];
+                $note_today = $request->message['text'];
 
                 $text = "หมายเหตุของวันนี้:\n";
-                $text .= "{$notetoday}\nถูกต้องมั้ยคะ?";
+                $text .= "{$note_today}\nถูกต้องมั้ยคะ?";
                 $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                cache()->put("chat_id_{$chat_id}_startNoteMemoDairy", 'confirm', now()->addMinutes(60));
-                cache()->put("chat_id_{$chat_id}_noteToday", $notetoday, now()->addMinutes(60));
-                $reply_to_message = $request->message['message_id'] ?? null;
+                cache()->put("chat_id_{$chat_id}_start_notetoday", 'confirm', now()->addMinutes(60));
+                cache()->put("chat_id_{$chat_id}_notetoday", $note_today, now()->addMinutes(60));
                 $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
             } elseif ($step === 'confirm') {
-                $confirmationText = 'yes';
+                $confirmation_text = 'yes';
                 $text_reply = '';
                 $text = $request->message['text'];
-                if ($text === $confirmationText) {
-                    $currentNoteToday = cache()->get("chat_id_{$chat_id}_noteToday");
-                    $currentTime = Carbon::now()->toDateString();
+                if ($text === $confirmation_text) {
+                    $current_notetoday = cache()->get("chat_id_{$chat_id}_notetoday");
+                    $current_time = Carbon::now()->toDateString();
 
-                    if ($currentNoteToday && Memo::where('user_id', $chat_id)->whereDate('memo_date', $currentTime)->exists()) {
-                        Memo::where('user_id', $chat_id)->where('memo_date', $currentTime)->update(['note_today' => $currentNoteToday]);
+                    if ($current_notetoday && Memo::where('user_id', $chat_id)->whereDate('memo_date', $current_time)->exists()) {
+                        Memo::where('user_id', $chat_id)->where('memo_date', $current_time)->update(['note_today' => $current_notetoday]);
                         $text_reply = "บันทึกหมายเหตุประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
-                    } elseif ($currentNoteToday) {
-                        Memo::create(['user_id' => $chat_id, 'note_today' => $currentNoteToday, 'memo_date' => $currentTime]);
+                    } elseif ($current_notetoday) {
+                        Memo::create(['user_id' => $chat_id, 'note_today' => $current_notetoday, 'memo_date' => $current_time]);
                         $text_reply = "บันทึกหมายเหตุประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
                     } else {
                         $text_reply = "ไม่มีหมายเหตุประจำวันที่จะบันทึกในขณะนี้ค่ะ!";
@@ -772,22 +787,31 @@ class TelegramController extends Controller
                 } else {
                     app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
                 }
-                cache()->forget("chat_id_{$chat_id}_startNoteMemoDairy");
-                cache()->forget("chat_id_{$chat_id}_noteToday");
+                cache()->forget("chat_id_{$chat_id}_start_notetoday");
+                cache()->forget("chat_id_{$chat_id}_notetoday");
             }
         }
         //generatedoc
         if ($request->message['text'] === '/generatedoc') {
             $user_info = $this->getUserInfo($chat_id);
             if ($user_info) {
+                $user_memo = Memo::where('user_id', $chat_id)->first();
+                if ($user_memo) {
                 $word_path = $this->generateWord($request);
                 // $pdf_path = $this->generatePDF($request);
                 app('telegram_bot')->sendDocument($chat_id, $word_path);
+                app('telegram_bot')->sendMessage($chat_id, 'อย่าลืมดาวน์โหลดไฟล์แล้วส่งให้พนักงานที่ปรึกษาลงนามในทุกสัปดาห์ด้วยนะ');
                 // app('telegram_bot')->sendDocument($chat_id, $pdf_path);
+            } else {
+                $text = "คุณยังไม่ได้จดบันทึกประจำวันใดๆเลย\n";
+                $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน";
+                $result = app('telegram_bot')->sendMessage($chat_id, $text);
+                return response()->json($result, 200);
+            }
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
                 $text .= "กรุณา /setinfo เพื่อตั้งค่าข้อมูลส่วนตัวก่อนทำการจดบันทึกใดๆ";
-                $result = app('telegram_bot')->sendMessage($text, $chat_id, $reply_to_message);
+                $result = app('telegram_bot')->sendMessage($chat_id, $text);
                 return response()->json($result, 200);
             }
         }
@@ -943,10 +967,10 @@ class TelegramController extends Controller
     }
 
     //function_setinfo
-    protected function handleSetInfoCommand($chat_id)
+    protected function setInfoForm($chat_id)
     {
-        $userInfo = User::where('telegram_chat_id', $chat_id)->first();
-        if ($userInfo) {
+        $user_info = User::where('telegram_chat_id', $chat_id)->first();
+        if ($user_info) {
             $text = "คุณได้ตั้งค่าข้อมูลส่วนตัวของคุณไปแล้ว!\n";
             $text .= "ถ้าคุณต้องการแก้ไขข้อมูลให้ใช้คำสั่ง /editinfo";
         } else {
@@ -957,21 +981,21 @@ class TelegramController extends Controller
             $text .= "4. สาขาวิชา\n";
             $text .= "5. สถานประกอบการ\n";
             $text .= "กรุณากรอกข้อมูลตามรูปแบบดังกล่าว\n";
-            cache()->put("chat_id_{$chat_id}_startSetInfo", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_start_set_info", 'waiting_for_command', now()->addMinutes(60));
         }
         $result = app('telegram_bot')->sendMessage($chat_id, $text);
         return response()->json($result, 200);
     }
 
-    protected function handleUserInfoInput($chat_id, $request)
+    protected function showSetInfoForm($request, $chat_id)
     {
-        $userInformationLines = explode("\n", $request->message['text']);
-        if (count($userInformationLines) === 5) {
-            $name = trim($userInformationLines[0]);
-            $student_id = trim($userInformationLines[1]);
-            $phone_number = trim(preg_replace('/\D/', '', $userInformationLines[2]));
-            $branch = isset($userInformationLines[3]) ? trim($userInformationLines[3]) : '';
-            $company = isset($userInformationLines[4]) ? trim($userInformationLines[4]) : '';
+        $user_information_lines = explode("\n", $request->message['text']);
+        if (count($user_information_lines) === 5) {
+            $name = trim($user_information_lines[0]);
+            $student_id = trim($user_information_lines[1]);
+            $phone_number = trim(preg_replace('/\D/', '', $user_information_lines[2]));
+            $branch = isset($user_information_lines[3]) ? trim($user_information_lines[3]) : '';
+            $company = isset($user_information_lines[4]) ? trim($user_information_lines[4]) : '';
 
             $text = "ข้อมูลที่คุณกรอกมีดังนี้:\n";
             $text .= "ชื่อ-นามสกุล: $name\n";
@@ -983,7 +1007,7 @@ class TelegramController extends Controller
 
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
-            cache()->put("chat_id_{$chat_id}_startSetInfo", 'confirm', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_start_set_info", 'confirm', now()->addMinutes(60));
             cache()->put("chat_id_{$chat_id}_user_info", compact('name', 'student_id', 'phone_number', 'branch', 'company'));
             return response()->json($result, 200);
         } else {
@@ -1000,66 +1024,66 @@ class TelegramController extends Controller
 
     protected function handleConfirmation($chat_id, $request)
     {
-        $confirmationText = 'yes';
+        $confirmation_text = 'yes';
         $text = $request->message['text'];
-        if ($text === $confirmationText) {
-            $userInformation = cache()->get("chat_id_{$chat_id}_user_info");
-            if ($userInformation) {
-                $this->handleYes($userInformation, $chat_id);
+        if ($text === $confirmation_text) {
+            $user_info = cache()->get("chat_id_{$chat_id}_user_info");
+            if ($user_info) {
+                $this->saveUserInfo($user_info, $chat_id);
                 app('telegram_bot')->sendMessage($chat_id, "บันทึกข้อมูลเรียบร้อยแล้ว", );
                 cache()->forget("chat_id_{$chat_id}_user_info");
-                cache()->forget("chat_id_{$chat_id}_startSetInfo");
+                cache()->forget("chat_id_{$chat_id}_start_set_info");
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
             }
         } elseif ($text === '/cancel') {
             app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /setinfo");
             cache()->forget("chat_id_{$chat_id}_user_info");
-            cache()->forget("chat_id_{$chat_id}_startSetInfo");
+            cache()->forget("chat_id_{$chat_id}_start_set_info");
         } else {
             app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
     }
-    public function handleYes(array $userInformation, $chat_id)
+    public function saveUserInfo(array $user_info, $chat_id)
     {
         User::create([
-            'name' => $userInformation['name'],
-            'student_id' => $userInformation['student_id'],
-            'phone_number' => $userInformation['phone_number'],
-            'branch' => $userInformation['branch'],
-            'company' => $userInformation['company'],
+            'name' => $user_info['name'],
+            'student_id' => $user_info['student_id'],
+            'phone_number' => $user_info['phone_number'],
+            'branch' => $user_info['branch'],
+            'company' => $user_info['company'],
             'telegram_chat_id' => $chat_id
         ]);
     }
     public function getUserInfo($telegram_chat_id)
     {
-        $userInfo = User::where('telegram_chat_id', $telegram_chat_id)->first();
-        return $userInfo;
+        $user_info = User::where('telegram_chat_id', $telegram_chat_id)->first();
+        return $user_info;
     }
     //function_setreminder
     public function setReminder(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
-        $userInfo = $this->getReminder($chat_id);
-        if ($userInfo['memo_time'] && $userInfo['summary_time']) {
+        $user_info = $this->getUserInfo($chat_id);
+        if ($user_info['memo_time'] && $user_info['summary_time']) {
             $text = "คุณตั้งค่าเวลาแจ้งเตือนจดบันทึกงานประจำวัน\n";
             $text .= "และตั้งค่าเวลาสรุปงานประจำวัน เรียบร้อยแล้ว!\n";
             $text .= "หากต้องการแก้ไข สามารถ /editreminder";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
             return response()->json($result, 200);
-        } else if ($userInfo['memo_time'] && !$userInfo['summary_time']) {
+        } else if ($user_info['memo_time'] && !$user_info['summary_time']) {
             $text = "คุณตั้งค่าเวลาแจ้งเตือนจดบันทึกงานประจำวัน เรียบร้อยแล้ว!\n";
             $text .= "กรุณา /forsummary เพื่อตั้งค่าแจ้งเตือนสรุปงานประจำวัน\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
-            cache()->put("chat_id_{$chat_id}_setreminder", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_set_reminder", 'waiting_for_command', now()->addMinutes(60));
 
             return response()->json($result, 200);
-        } else if (!$userInfo['memo_time'] && $userInfo['summary_time']) {
+        } else if (!$user_info['memo_time'] && $user_info['summary_time']) {
             $text = "คุณตั้งค่าเวลาแจ้งเตือนจดบันทึกงานประจำวัน เรียบร้อยแล้ว!\n";
             $text .= "กรุณา /formemo เพื่อตั้งค่าแจ้งเตือนสรุปงานประจำวัน\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
-            cache()->put("chat_id_{$chat_id}_setreminder", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_set_reminder", 'waiting_for_command', now()->addMinutes(60));
 
             return response()->json($result, 200);
         } else {
@@ -1068,7 +1092,7 @@ class TelegramController extends Controller
             $text .= "2. /forsummary - แจ้งเตือนสรุปงานประจำวัน\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
-            cache()->put("chat_id_{$chat_id}_setreminder", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_set_reminder", 'waiting_for_command', now()->addMinutes(60));
 
             return response()->json($result, 200);
         }
@@ -1084,7 +1108,7 @@ class TelegramController extends Controller
         $text .= "กรุณาตอบเป็นตัวเลข(1-2)\n";
         $result = app('telegram_bot')->sendMessage($chat_id, $text);
 
-        cache()->put("chat_id_{$chat_id}_editreminder", 'waiting_for_command', now()->addMinutes(60));
+        cache()->put("chat_id_{$chat_id}_edit_reminder", 'waiting_for_command', now()->addMinutes(60));
 
         return response()->json($result, 200);
     }
@@ -1093,21 +1117,21 @@ class TelegramController extends Controller
     {
         $chat_id = $request->message['from']['id'] ?? null;
         $text = strtolower(trim($request->input('message.text')));
-        $confirmationText = 'yes';
+        $confirmation_text = 'yes';
         $text_reply = '';
-        if ($text === $confirmationText) {
-            $setReminderTime = cache()->get("chat_id_{$chat_id}_setreminder");
-            if ($setReminderTime) {
-                switch ($setReminderTime['type']) {
+        if ($text === $confirmation_text) {
+            $set_reminder_time = cache()->get("chat_id_{$chat_id}_set_reminder");
+            if ($set_reminder_time) {
+                switch ($set_reminder_time['type']) {
                     case '/formemo':
                         User::where('telegram_chat_id', $chat_id)->update([
-                            'memo_time' => $setReminderTime['time'],
+                            'memo_time' => $set_reminder_time['time'],
                         ]);
                         $text_reply = "ตั้งค่าเวลาแจ้งเตือนเริ่มจดบันทึกงานประจำวันเรียบร้อยแล้ว!";
                         break;
                     case '/forsummary':
                         User::where('telegram_chat_id', $chat_id)->update([
-                            'summary_time' => $setReminderTime['time'],
+                            'summary_time' => $set_reminder_time['time'],
                         ]);
                         $text_reply = "ตั้งค่าเวลาแจ้งเตือนสรุปงานประจำวันเรียบร้อยแล้ว!";
                         break;
@@ -1115,13 +1139,13 @@ class TelegramController extends Controller
                         break;
                 }
                 app('telegram_bot')->sendMessage($chat_id, $text_reply);
-                cache()->forget("chat_id_{$chat_id}_setreminder");
+                cache()->forget("chat_id_{$chat_id}_set_reminder");
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
             }
         } elseif ($text === '/cancel') {
             app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /setreminder");
-            cache()->forget("chat_id_{$chat_id}_setreminder");
+            cache()->forget("chat_id_{$chat_id}_set_reminder");
         } else {
             app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
@@ -1131,22 +1155,21 @@ class TelegramController extends Controller
     {
         $chat_id = $request->message['from']['id'] ?? null;
         $text = strtolower(trim($request->input('message.text')));
-        $confirmationText = 'yes';
+        $confirmation_text = 'yes';
         $text_reply = '';
-        if ($text === $confirmationText) {
-            $setReminderTime = cache()->get("chat_id_{$chat_id}_editreminder");
-            if ($setReminderTime) {
-
-                switch ($setReminderTime['type']) {
+        if ($text === $confirmation_text) {
+            $set_reminder_time = cache()->get("chat_id_{$chat_id}_edit_reminder");
+            if ($set_reminder_time) {
+                switch ($set_reminder_time['type']) {
                     case '/formemo':
                         User::where('telegram_chat_id', $chat_id)->update([
-                            'memo_time' => $setReminderTime['time'],
+                            'memo_time' => $set_reminder_time['time'],
                         ]);
                         $text_reply = "แก้ไขเวลาแจ้งเตือนเริ่มจดบันทึกงานประจำวันเรียบร้อยแล้ว!";
                         break;
                     case '/forsummary':
                         User::where('telegram_chat_id', $chat_id)->update([
-                            'summary_time' => $setReminderTime['time'],
+                            'summary_time' => $set_reminder_time['time'],
                         ]);
                         $text_reply = "แก้ไขเวลาแจ้งเตือนสรุปงานประจำวันเรียบร้อยแล้ว!";
                         break;
@@ -1154,47 +1177,46 @@ class TelegramController extends Controller
                         break;
                 }
                 app('telegram_bot')->sendMessage($chat_id, $text_reply);
-                cache()->forget("chat_id_{$chat_id}_editreminder");
+                cache()->forget("chat_id_{$chat_id}_edit_reminder");
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
             }
         } elseif ($text === '/cancel') {
             app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /editreminder");
-            cache()->forget("chat_id_{$chat_id}_editreminder");
+            cache()->forget("chat_id_{$chat_id}_edit_reminder");
         } else {
             app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
-    }
-    public function getReminder($telegram_chat_id)
-    {
-        $userReminder = User::where('telegram_chat_id', $telegram_chat_id)->first();
-        return $userReminder;
     }
     //memo
 
     private function getMemo($memo, $index)
     {
-        $memoArray = explode(',', $memo);
-        return isset($memoArray[$index]) ? trim($memoArray[$index]) : '……………………………………………………………………………………';
+        if ($memo) {
+            $memoArray = explode(',', $memo);
+            return isset($memoArray[$index]) ? trim($memoArray[$index]) : '……………………………………………………………………………………';
+        } else {
+            return '……………………………………………………………………………………';
+        }
     }
     public function editMemoDairy(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
-        $userMemo = $this->getUserMemo($chat_id);
-        if (!$userMemo || !$userMemo['memo'] || (!$userMemo['memo'] && !$userMemo['note_today'])) {
+        $user_memo = $this->getUserMemo($chat_id);
+        if (!$user_memo || !$user_memo['memo'] || (!$user_memo['memo'] && !$user_memo['note_today'])) {
             $text = "คุณยังไม่ได้จดบันทึกงานประจำวัน!\n";
             $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             return response()->json($result, 200);
-        } elseif ($userMemo['memo']) {
-            $currentMemo = explode(', ', $userMemo['memo']);
-            $formattedMemo = [];
-            foreach ($currentMemo as $key => $memo) {
-                $formattedMemo[] = ($key + 1) . ". " . $memo;
+        } elseif ($user_memo['memo']) {
+            $current_memo = explode(', ', $user_memo['memo']);
+            $formatted_memo = [];
+            foreach ($current_memo as $key => $memo) {
+                $formatted_memo[] = ($key + 1) . ". " . $memo;
             }
-            $text = "กรุณาเลือกบันทึกที่ต้องการแก้ไข:\n" . implode("\n", $formattedMemo);
+            $text = "กรุณาเลือกบันทึกที่ต้องการแก้ไข:\n" . implode("\n", $formatted_memo);
             $text .= "\nกรุณาตอบเพียงตัวเลขเดียวเท่านั้น ";
-            cache()->put("chat_id_{$chat_id}_editMemoDairy", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_start_edit_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             return response()->json($result, 200);
         }
@@ -1202,32 +1224,32 @@ class TelegramController extends Controller
     public function addMemoDairy(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
-        $userMemo = $this->getUserMemo($chat_id);
-        if (!$userMemo || !$userMemo['memo'] || (!$userMemo['memo'] && !$userMemo['note_today'])) {
+        $user_memo = $this->getUserMemo($chat_id);
+        if (!$user_memo || !$user_memo['memo'] || (!$user_memo['memo'] && !$user_memo['note_today'])) {
             $text = "คุณยังไม่ได้จดบันทึกงานประจำวัน!\n";
             $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             return response()->json($result, 200);
-        } elseif ($userMemo['memo']) {
+        } elseif ($user_memo['memo']) {
             $text = "สามารถพิมพ์ข้อความใดๆเพื่อเพิ่มบันทึกงานประจำวันได้เลยค่ะ\n";
             $text .= "ยกตัวอย่าง 'Create function CRUD'\n";
             $text .= "เมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
-            cache()->put("chat_id_{$chat_id}_startAddMemoDairy", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
             return response()->json($result, 200);
         }
     }
     public function memoDairy(Request $request)
     {
         $chat_id = $request->message['from']['id'] ?? null;
-        $userMemo = $this->getUserMemo($chat_id);
-        if (!$userMemo || !$userMemo['memo']) {
+        $user_memo = $this->getUserMemo($chat_id);
+        if (!$user_memo || !$user_memo['memo']) {
             $text = "สามารถพิมพ์ข้อความใดๆเพื่อจดบันทึกงานประจำวันได้เลยค่ะ\n";
             $text .= "ยกตัวอย่าง 'Create function CRUD'\n";
             $text .= "เมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
-            cache()->put("chat_id_{$chat_id}_startMemoDairy", 'waiting_for_command', now()->addMinutes(60));
-            cache()->put("chat_id_{$chat_id}_memoDaily", [], now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
+            cache()->put("chat_id_{$chat_id}_memo_daily", [], now()->addMinutes(60));
             return response()->json($result, 200);
         } else {
             $text = "คุณเริ่มจดบันทึกประจำวันไปแล้ว!\n\n";
@@ -1245,8 +1267,8 @@ class TelegramController extends Controller
     }
     public function getUserMemo($telegram_chat_id)
     {
-        $currentDate = Carbon::now()->toDateString();
-        $userMemo = Memo::where('user_id', $telegram_chat_id)->where('memo_date', $currentDate)->first();
-        return $userMemo;
+        $current_date = Carbon::now()->toDateString();
+        $user_memo = Memo::where('user_id', $telegram_chat_id)->where('memo_date', $current_date)->first();
+        return $user_memo;
     }
 }
