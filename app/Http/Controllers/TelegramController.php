@@ -74,7 +74,23 @@ class TelegramController extends Controller
             if ($step === 'waiting_for_command') {
                 return $this->showSetInfoForm($chat_id, $request);
             } elseif ($step === 'confirm') {
-                return $this->handleConfirmation($chat_id, $request);
+                return $this->handleConfirmation(
+                    $request,
+                    $chat_id,
+                    ['chat_id_' . $chat_id . '_user_info', 'chat_id_' . $chat_id . '_start_set_info',],
+                    'บันทึกข้อมูลเรียบร้อยแล้ว',
+                    'ยกเลิกการ /setinfo',
+                    function () use ($chat_id) {
+                        $user_info = cache()->get("chat_id_{$chat_id}_user_info");
+                        if ($user_info) {
+                            $this->saveUserInfo($user_info, $chat_id);
+                            cache()->forget("chat_id_{$chat_id}_user_info");
+                            cache()->forget("chat_id_{$chat_id}_start_set_info");
+                        } else {
+                            app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
+                        }
+                    }
+                );
             }
         }
         //editinfo
@@ -142,38 +158,34 @@ class TelegramController extends Controller
                 app('telegram_bot')->sendMessage($chat_id, $text);
                 cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_time', now()->addMinutes(60));
             } elseif ($step === 'waiting_for_time') {
-                $confirmation_text = 'yes';
-                $text = $request->message['text'];
-                $text_update = cache()->get("chat_id_{$chat_id}_edit_user_info");
-                if ($text === $confirmation_text) {
-                    $user_info = cache()->get("chat_id_{$chat_id}_select_choice_edit");
-                    if ($user_info) {
-                        $column_name = [
-                            1 => 'name',
-                            2 => 'student_id',
-                            3 => 'phone_number',
-                            4 => 'branch',
-                            5 => 'company'
-                        ];
-                        User::where('telegram_chat_id', $chat_id)->update([
-                            $column_name[$user_info] => $text_update
-                        ]);
-                        app('telegram_bot')->sendMessage($chat_id, "แก้ไขข้อมูลเรียบร้อยแล้ว");
-                        cache()->forget("chat_id_{$chat_id}_edit_user_info");
-                        cache()->forget("chat_id_{$chat_id}_start_edit_info");
-                        cache()->forget("chat_id_{$chat_id}_select_choice_edit");
-                    } else {
-                        app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
+                $this->handleConfirmation(
+                    $request,
+                    $chat_id,
+                    ['chat_id_' . $chat_id . 'edit_user_info', 'chat_id_' . $chat_id . 'start_edit_info', 'chat_id_' . $chat_id . 'select_choice_edit'],
+                    'แก้ไขข้อมูลเรียบร้อยแล้ว',
+                    'ยกเลิกการ /editinfo',
+                    function () use ($chat_id) {
+                        $text_update = cache()->get("chat_id_{$chat_id}_edit_user_info");
+                        $user_info = cache()->get("chat_id_{$chat_id}_select_choice_edit");
+                        if ($user_info) {
+                            $column_name = [
+                                1 => 'name',
+                                2 => 'student_id',
+                                3 => 'phone_number',
+                                4 => 'branch',
+                                5 => 'company'
+                            ];
+                            User::where('telegram_chat_id', $chat_id)->update([
+                                $column_name[$user_info] => $text_update
+                            ]);
+                            cache()->forget("chat_id_{$chat_id}_edit_user_info");
+                            cache()->forget("chat_id_{$chat_id}_start_edit_info");
+                            cache()->forget("chat_id_{$chat_id}_select_choice_edit");
+                        } else {
+                            app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
+                        }
                     }
-                } elseif ($text === '/cancel') {
-                    app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /editinfo");
-                    cache()->forget("chat_id_{$chat_id}_edit_user_info");
-                    cache()->forget("chat_id_{$chat_id}_start_edit_info");
-                    cache()->forget("chat_id_{$chat_id}_select_choice_edit");
-                } else {
-                    app('telegram_bot')->sendMessage($chat_id, "/edit user กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
-                }
-
+                );
             }
         }
         //getinfo
@@ -623,7 +635,7 @@ class TelegramController extends Controller
                     if (!empty($current_memo)) {
                         $formatted_memo = implode(', ', $current_memo);
                         $current_date = Carbon::now()->toDateString();
-                        Memo::where('user_id', $chat_id)->where('memo_date', $current_date)->update(['memo' => $formatted_memo,]);
+                        Memo::where('user_id', $chat_id)->where('memo_date', $current_date)->update(['memo' => $formatted_memo]);
                         $text_reply = "บันทึกงานประจำวันของวันนี้เรียบร้อยแล้วค่ะ!";
                     } else {
                         $text_reply = "ไม่มีงานประจำวันที่จะบันทึกในขณะนี้ค่ะ!";
@@ -1041,26 +1053,56 @@ class TelegramController extends Controller
         }
     }
 
-    protected function handleConfirmation($chat_id, $request)
-    {
+    // protected function handleConfirmation($chat_id, $request)
+    // {
+    //     $confirmation_text = 'yes';
+    //     $text = $request->message['text'];
+    //     if ($text === $confirmation_text) {
+    //         $user_info = cache()->get("chat_id_{$chat_id}_user_info");
+    //         if ($user_info) {
+    //             $this->saveUserInfo($user_info, $chat_id);
+    //             app('telegram_bot')->sendMessage($chat_id, "บันทึกข้อมูลเรียบร้อยแล้ว", );
+    //             cache()->forget("chat_id_{$chat_id}_user_info");
+    //             cache()->forget("chat_id_{$chat_id}_start_set_info");
+    //         } else {
+    //             app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
+    //         }
+    //     } elseif ($text === '/cancel') {
+    //         app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /setinfo");
+    //         cache()->forget("chat_id_{$chat_id}_user_info");
+    //         cache()->forget("chat_id_{$chat_id}_start_set_info");
+    //     } else {
+    //         app('telegram_bot')->sendMessage($chat_id, "/setinfo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
+    //     }
+    // }
+
+    protected function handleConfirmation(
+        $request,
+        $chat_id,
+        $reply_to_message,
+        $cache_keys,
+        $success_message,
+        $cancel_message,
+        $update_callback = null
+    ) {
         $confirmation_text = 'yes';
         $text = $request->message['text'];
-        if ($text === $confirmation_text) {
-            $user_info = cache()->get("chat_id_{$chat_id}_user_info");
-            if ($user_info) {
-                $this->saveUserInfo($user_info, $chat_id);
-                app('telegram_bot')->sendMessage($chat_id, "บันทึกข้อมูลเรียบร้อยแล้ว", );
-                cache()->forget("chat_id_{$chat_id}_user_info");
-                cache()->forget("chat_id_{$chat_id}_start_set_info");
+        foreach ($cache_keys as $cache_key) {
+            if ($text === $confirmation_text) {
+                if ($update_callback && is_callable($update_callback)) {
+                    $update_callback();
+                    app('telegram_bot')->sendMessage($success_message, $chat_id, $reply_to_message);
+                } else {
+                    app('telegram_bot')->sendMessage("ไม่พบข้อมูล user", $chat_id, $reply_to_message);
+                }
+            } elseif ($text === '/cancel') {
+                app('telegram_bot')->sendMessage($cancel_message, $chat_id, $reply_to_message);
+                foreach ($cache_keys as $key) {
+                    cache()->forget("{$key}_{$chat_id}");
+                }
             } else {
-                app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
+                app('telegram_bot')->sendMessage("กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ", $chat_id, $reply_to_message);
             }
-        } elseif ($text === '/cancel') {
-            app('telegram_bot')->sendMessage($chat_id, "ยกเลิกการ /setinfo");
-            cache()->forget("chat_id_{$chat_id}_user_info");
-            cache()->forget("chat_id_{$chat_id}_start_set_info");
-        } else {
-            app('telegram_bot')->sendMessage($chat_id, "/setinfo กรุณาตอบด้วย 'yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
     }
     public function saveUserInfo(array $user_info, $chat_id)
