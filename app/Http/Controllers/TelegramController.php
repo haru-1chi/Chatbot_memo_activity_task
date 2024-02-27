@@ -158,7 +158,7 @@ class TelegramController extends Controller
                 app('telegram_bot')->sendMessage($chat_id, $text);
                 cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_time', now()->addMinutes(60));
             } elseif ($step === 'waiting_for_time') {
-                $this->handleConfirmation(
+                return $this->handleConfirmation(
                     $request,
                     $chat_id,
                     ['chat_id_' . $chat_id . 'edit_user_info', 'chat_id_' . $chat_id . 'start_edit_info', 'chat_id_' . $chat_id . 'select_choice_edit'],
