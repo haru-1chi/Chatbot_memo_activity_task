@@ -239,25 +239,33 @@ class TelegramController extends Controller
             } elseif ($step === 'waiting_for_time') {
                 if ($select === '/formemo') {
                     $time = $request->message['text'];
-
-                    $text = "ให้แจ้งเตือนเริ่มจดบันทึกงานประจำวันในเวลา\n";
-                    $text .= "{$time} น. ใช่ไหมคะ?\n";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                    app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
-                    cache()->put("chat_id_{$chat_id}_start_set_reminder", 'confirm', now()->addMinutes(60));
-                    cache()->forget("chat_id_{$chat_id}_select_type");
+                    if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
+                        $text = "ให้แจ้งเตือนเริ่มจดบันทึกงานประจำวันในเวลา\n";
+                        $text .= "{$time} น. ใช่ไหมคะ?\n";
+                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                        cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_set_reminder", 'confirm', now()->addMinutes(60));
+                        cache()->forget("chat_id_{$chat_id}_select_type");
+                    } else {
+                        $text = "รูปแบบเวลาไม่ถูกต้อง กรุณากรอกเวลาในรูปแบบ HH:MM (นาฬิกา 24 ชั่วโมง) เท่านั้น";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                    }
                 }
                 if ($select === '/forsummary') {
                     $time = $request->message['text'];
-
-                    $text = "ให้แจ้งเตือนสรุปงานประจำวันในเวลา\n";
-                    $text .= "{$time} น. ใช่ไหมคะ?\n";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                    app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
-                    cache()->put("chat_id_{$chat_id}_start_set_reminder", 'confirm', now()->addMinutes(60));
-                    cache()->forget("chat_id_{$chat_id}_select_type");
+                    if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
+                        $text = "ให้แจ้งเตือนสรุปงานประจำวันในเวลา\n";
+                        $text .= "{$time} น. ใช่ไหมคะ?\n";
+                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                        cache()->put("chat_id_{$chat_id}_set_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_set_reminder", 'confirm', now()->addMinutes(60));
+                        cache()->forget("chat_id_{$chat_id}_select_type");
+                    } else {
+                        $text = "รูปแบบเวลาไม่ถูกต้อง กรุณากรอกเวลาในรูปแบบ HH:MM (นาฬิกา 24 ชั่วโมง) เท่านั้น";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                    }
                 }
             } elseif ($step === 'confirm') {
                 return $this->handleReminderConfirmation($request);
@@ -307,24 +315,33 @@ class TelegramController extends Controller
             } elseif ($step === 'waiting_for_time') {
                 if ($select === '/formemo') {
                     $time = $request->message['text'];
-                    $text = "ให้แจ้งเตือนเริ่มจดบันทึกงานประจำวันในเวลา\n";
-                    $text .= "{$time} น. ใช่ไหมคะ?\n";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                    app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
-                    cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'confirm', now()->addMinutes(60));
-                    cache()->forget("chat_id_{$chat_id}_select_type_edit");
+                    if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
+                        $text = "ให้แจ้งเตือนเริ่มจดบันทึกงานประจำวันในเวลา\n";
+                        $text .= "{$time} น. ใช่ไหมคะ?\n";
+                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                        cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/formemo', 'time' => $time], now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'confirm', now()->addMinutes(60));
+                        cache()->forget("chat_id_{$chat_id}_select_type_edit");
+                    } else {
+                        $text = "รูปแบบเวลาไม่ถูกต้อง กรุณากรอกเวลาในรูปแบบ HH:MM (นาฬิกา 24 ชั่วโมง) เท่านั้น";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                    }
                 }
                 if ($select === '/forsummary') {
                     $time = $request->message['text'];
-
-                    $text = "ให้แจ้งเตือนสรุปงานประจำวันในเวลา\n";
-                    $text .= "{$time} น. ใช่ไหมคะ?\n";
-                    $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
-                    app('telegram_bot')->sendMessage($chat_id, $text);
-                    cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
-                    cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'confirm', now()->addMinutes(60));
-                    cache()->forget("chat_id_{$chat_id}_select_type_edit");
+                    if (preg_match('/^(2[0-3]|[01][0-9]):([0-5][0-9])$/', $time)) {
+                        $text = "ให้แจ้งเตือนสรุปงานประจำวันในเวลา\n";
+                        $text .= "{$time} น. ใช่ไหมคะ?\n";
+                        $text .= "(กรุณาตอบ yes หรือ /cancel)\n";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                        cache()->put("chat_id_{$chat_id}_edit_reminder", ['type' => '/forsummary', 'time' => $time], now()->addMinutes(60));
+                        cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'confirm', now()->addMinutes(60));
+                        cache()->forget("chat_id_{$chat_id}_select_type_edit");
+                    } else {
+                        $text = "รูปแบบเวลาไม่ถูกต้อง กรุณากรอกเวลาในรูปแบบ HH:MM (นาฬิกา 24 ชั่วโมง) เท่านั้น";
+                        app('telegram_bot')->sendMessage($chat_id, $text);
+                    }
                 }
             } elseif ($step === 'confirm') {
                 return $this->handleEditReminderConfirmation($request);
