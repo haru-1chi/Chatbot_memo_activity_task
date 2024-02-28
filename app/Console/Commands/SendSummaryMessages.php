@@ -42,31 +42,31 @@ class SendSummaryMessages extends Command
     public function handle()
     {
         info('called when summary_time');
-        $currentTime = Carbon::now();
-        if ($currentTime->isWeekday()) {
+        $current_time = Carbon::now();
+        if ($current_time->isWeekday()) {
             $users = User::whereNotNull('telegram_chat_id')->get();
             foreach ($users as $user) {
                 if ($user->summary_time) {
-                    $summaryTime = Carbon::createFromFormat('H:i:s', $user->summary_time)->format('H:i');
-                    $currentTimeFormatted = $currentTime->format('H:i');
-                    if ($currentTimeFormatted === $summaryTime) {
-                        $userMemo = $this->getUserMemo($user->telegram_chat_id);
-                        if (!$userMemo || (!$userMemo['memo'] && !$userMemo['note_today'])) {
+                    $summary_time = Carbon::createFromFormat('H:i:s', $user->summary_time)->format('H:i');
+                    $current_time_formatted = $current_time->format('H:i');
+                    if ($current_time_formatted === $summary_time) {
+                        $user_memo = $this->getUserMemo($user->telegram_chat_id);
+                        if (!$user_memo || (!$user_memo['memo'] && !$user_memo['note_today'])) {
                             $text = "สรุปงานที่ได้ทำในวันนี้:\n";
                             $text = "คุณยังไม่ได้จดบันทึกงานประจำวัน!\n";
                             $text .= "กรุณา /memo เพื่อเริ่มจดบันทึกประจำวัน\n\n";
                             $text .= "หรือหากวันนี้ลาหยุด หรือเป็นวันหยุดราชการ ให้พิมพ์ /notetoday เพื่อเพิ่มหมายเหตุวันนี้\n";
                             $text .= "กรุณาจดบันทึกก่อนเวลา 23:59 น. ของวันนี้ด้วยนะ";
                             $this->sendMessageToUser($user->telegram_chat_id, $text);
-                        } elseif ($userMemo['memo']){
-                            $memoArray = explode(', ', $userMemo['memo']);
-                            $formattedMemo = [];
-                            foreach ($memoArray as $key => $memo) {
-                                $formattedMemo[] = ($key + 1) . ". " . $memo;
+                        } elseif ($user_memo['memo']){
+                            $memo_array = explode(', ', $user_memo['memo']);
+                            $formatted_memo = [];
+                            foreach ($memo_array as $key => $memo) {
+                                $formatted_memo[] = ($key + 1) . ". " . $memo;
                             }
-                            $text = "สรุปงานที่ได้ทำในวันนี้:\n" . implode("\n", $formattedMemo);
-                            if ($userMemo['note_today']) {
-                                $text .= "\n\nหมายเหตุประจำวัน:\n{$userMemo['note_today']}";
+                            $text = "สรุปงานที่ได้ทำในวันนี้:\n" . implode("\n", $formatted_memo);
+                            if ($user_memo['note_today']) {
+                                $text .= "\n\nหมายเหตุประจำวัน:\n{$user_memo['note_today']}";
                             }
                             $text .= "\n\nหรือคุณต้องการ\n";
                             $text .= "   /addmemo - เพิ่มบันทึกงานประจำวัน\n";
@@ -79,9 +79,9 @@ class SendSummaryMessages extends Command
 
                             $this->sendMessageToUser($user->telegram_chat_id, $text);
 
-                        } elseif ($userMemo['note_today'] && empty($userMemo['memo'])) {
+                        } elseif ($user_memo['note_today'] && empty($user_memo['memo'])) {
                             $text = "สรุปงานที่ได้ทำในวันนี้:\nไม่มีบันทึกงานประจำวัน";
-                            $text .= "หมายเหตุประจำวัน:\n{$userMemo['note_today']}";
+                            $text .= "หมายเหตุประจำวัน:\n{$user_memo['note_today']}";
                             $text .= "\n\nหรือคุณต้องการ\n";
                             $text .= "   /memo - เริ่มจดบันทึกงานประจำวัน\n";
                             $text .= "   /addmemo - เพิ่มบันทึกงานประจำวัน\n";
@@ -108,19 +108,19 @@ class SendSummaryMessages extends Command
     /**
      * Send message to user using Telegram Bot service.
      *
-     * @param int $chatId
+     * @param int $chat_id
      * @param string $message
      * @return void
      */
-    private function sendMessageToUser($chatId, $message)
+    private function sendMessageToUser($chat_id, $message)
     {
-        $this->telegramBot->sendMessage($chatId, $message);
+        $this->telegramBot->sendMessage($chat_id, $message);
     }
 
     public function getUserMemo($telegram_chat_id)
     {
-        $currentDate = now()->toDateString();
-        $userMemo = Memo::where('user_id', $telegram_chat_id)->where('memo_date', $currentDate)->first();
-        return $userMemo;
+        $current_date = now()->toDateString();
+        $user_memo = Memo::where('user_id', $telegram_chat_id)->where('memo_date', $current_date)->first();
+        return $user_memo;
     }
 }

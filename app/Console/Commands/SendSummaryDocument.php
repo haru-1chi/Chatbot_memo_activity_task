@@ -60,31 +60,25 @@ class SendSummaryDocument extends Command
     private function sendSummaryDocumentToUser($user)
     {
         $chat_id = $user->telegram_chat_id;
-
         $user_info = $this->getUserInfo($chat_id);
-
         if (!$user_info) {
             $this->sendMessage($chat_id, 'คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!');
             return;
         }
-
         $user_memo = $this->getUserMemo($chat_id);
-
         if (!$user_memo) {
             $this->sendMessage($chat_id, 'คุณยังไม่ได้จดบันทึกประจำวันใดๆเลย');
             return;
         }
-
         $word_path = $this->generateWord($chat_id);
-
         $this->telegramBot->sendDocument($chat_id, $word_path);
         $this->sendMessage($chat_id, 'อย่าลืมดาวน์โหลดไฟล์แล้วส่งให้พนักงานที่ปรึกษาลงนามในทุกสัปดาห์ด้วยนะ');
     }
 
     public function getUserMemo($telegram_chat_id)
     {
-        $currentDate = now()->toDateString();
-        return Memo::where('user_id', $telegram_chat_id)->where('memo_date', $currentDate)->first();
+        $current_date = now()->toDateString();
+        return Memo::where('user_id', $telegram_chat_id)->where('memo_date', $current_date)->first();
     }
 
 
