@@ -93,7 +93,7 @@ class TelegramController extends Controller
                             app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
                         }
                     }
-                );
+                );// check handle confirm true/false 
             }
         }
         //editinfo
@@ -118,7 +118,7 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_start_edit_info")) {
+        if (cache()->has("chat_id_{$chat_id}_start_edit_info")) { //ถ้า cache เป็น status หรือ variable
             $step = cache()->get("chat_id_{$chat_id}_start_edit_info");
             $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
             $user_info = $this->getUserInfo($chat_id);
@@ -1147,10 +1147,10 @@ class TelegramController extends Controller
         $request,
         $chat_id,
         $cacheKeys,
-        $cancel_message,
+        $cancel_message,//เอาออก
         $update_callback = null
     ) {
-        $confirmation_text = '/yes';
+        $confirmation_text = '/yes';//ซ้ำซ้อน
         $text = $request->message['text'];
 
         if ($text === $confirmation_text) {
@@ -1158,12 +1158,12 @@ class TelegramController extends Controller
                 $update_callback();
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
-            }
+            } //return true
         } elseif ($text === '/cancel') {
             app('telegram_bot')->sendMessage($chat_id, $cancel_message);
             foreach ($cacheKeys as $cacheKey) {
                 cache()->forget($cacheKey);
-            }
+            }//return false ot cancel
         } else {
             app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย '/yes' หรือ '/cancel' เท่านั้นค่ะ");
         }

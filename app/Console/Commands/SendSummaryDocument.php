@@ -42,10 +42,17 @@ class SendSummaryDocument extends Command
     public function handle()
     {
         $users = User::whereNotNull('telegram_chat_id')->get();
-
         foreach ($users as $user) {
-            $this->sendSummaryDocumentToUser($user);
+            $text = "วันนี้อย่าลืมจดบันทึกงานประจำวันด้วยนะ\n";
+            $text .= "กรุณาพิมพ์ /memo เพื่อเริ่มจดบันทึก\n\n";
+            $text .= "หรือหากวันนี้ลาหยุด หรือเป็นวันหยุดราชการ ให้พิมพ์ /notetoday เพื่อเพิ่มหมายเหตุวันนี้\n";
+            $this->sendMessageToUser($user->telegram_chat_id, $text);
         }
+        // $users = User::whereNotNull('telegram_chat_id')->get();
+
+        // foreach ($users as $user) {
+        //     $this->sendSummaryDocumentToUser($user);
+        // }
     }
 
 
@@ -161,8 +168,8 @@ class SendSummaryDocument extends Command
 
         return "$day {$thai_months[$month]} $year";
     }
-    
-        /**
+
+    /**
      * Send message to user using Telegram Bot service.
      *
      * @param int $chat_id
