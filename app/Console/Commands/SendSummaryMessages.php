@@ -94,7 +94,7 @@ class SendSummaryMessages extends Command
                             $this->sendMessageToUser($user->telegram_chat_id, $text);
                         }
                     }
-                } else {
+                } elseif (!$user->memo_time && $current_time->format('H:i') === '18:00') {
                     $text = "นี่เป็นข้อความแจ้งเตือนสรุปงานประจำวันเบื้องต้น\n";
                     $text .= "กรุณา /setreminder เพื่อตั้งค่าการแจ้งเตือน\n\n";
                     $text .= "อย่าลืมตั้งค่าเวลาแจ้งเตือนสรุปงานประจำวันด้วยนะ\n";

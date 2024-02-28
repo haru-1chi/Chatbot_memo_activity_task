@@ -62,17 +62,17 @@ class SendSummaryDocument extends Command
         $chat_id = $user->telegram_chat_id;
         $user_info = $this->getUserInfo($chat_id);
         if (!$user_info) {
-            $this->sendMessage($chat_id, 'คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!');
+            $this->sendMessageToUser($chat_id, 'คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!');
             return;
         }
         $user_memo = $this->getUserMemo($chat_id);
         if (!$user_memo) {
-            $this->sendMessage($chat_id, 'คุณยังไม่ได้จดบันทึกประจำวันใดๆเลย');
+            $this->sendMessageToUser($chat_id, 'คุณยังไม่ได้จดบันทึกประจำวันใดๆเลย');
             return;
         }
         $word_path = $this->generateWord($chat_id);
-        $this->telegramBot->sendDocument($chat_id, $word_path);
-        $this->sendMessage($chat_id, 'อย่าลืมดาวน์โหลดไฟล์แล้วส่งให้พนักงานที่ปรึกษาลงนามในทุกสัปดาห์ด้วยนะ');
+        $this->sendDocumentToUser($chat_id, $word_path);
+        $this->sendMessageToUser($chat_id, 'อย่าลืมดาวน์โหลดไฟล์แล้วส่งให้พนักงานที่ปรึกษาลงนามในทุกสัปดาห์ด้วยนะ');
     }
 
     public function getUserMemo($telegram_chat_id)
@@ -161,8 +161,22 @@ class SendSummaryDocument extends Command
 
         return "$day {$thai_months[$month]} $year";
     }
-    private function sendMessage($chat_id, $message)
+    
+        /**
+     * Send message to user using Telegram Bot service.
+     *
+     * @param int $chat_id
+     * @param string $message
+     * @param string $word_path
+     * @return void
+     */
+    private function sendMessageToUser($chat_id, $message)
     {
         $this->telegramBot->sendMessage($chat_id, $message);
+    }
+
+    private function sendDocumentToUser($chat_id, $word_path)
+    {
+        $this->telegramBot->sendDocument($chat_id, $word_path);
     }
 }

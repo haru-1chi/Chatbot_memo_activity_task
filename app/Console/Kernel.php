@@ -2,12 +2,8 @@
 
 namespace App\Console;
 
-use App\Console\Commands\SendMemoMessages;
-use App\Console\Commands\SendSummaryMessages;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
-use App\Models\User;
-use Carbon\Carbon;
 
 class Kernel extends ConsoleKernel
 {
