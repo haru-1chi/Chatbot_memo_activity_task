@@ -1350,4 +1350,14 @@ class TelegramController extends Controller
         $user_memo = Memo::where('user_id', $telegram_chat_id)->where('memo_date', $current_date)->first();
         return $user_memo;
     }
+
+    function forgetUserCache($chat_id) {
+        $keys = Cache::getStore()->getPrefix() . 'chat_id_' . $chat_id . '_*';
+        $keys = Cache::getStore()->get($keys);
+        if ($keys) {
+            foreach ($keys as $key) {
+                Cache::forget($key);
+            }
+        }
+    }
 }
