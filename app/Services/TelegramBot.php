@@ -8,7 +8,7 @@ class TelegramBot
 {
     protected $token;
     protected $api_endpoint;
-    protected $headers;
+   protected $headers;
 
     public function __construct()
     {

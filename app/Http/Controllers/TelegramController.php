@@ -28,10 +28,10 @@ class TelegramController extends Controller
         $chat_id = $request->message['from']['id'] ?? null;
 
         if ($request->message['text'] === '/cancel') {
-            Cache::flush();
-            // cache()->forget("chat_id_{$chat_id}_start_set_info");
-            // cache()->forget("chat_id_{$chat_id}_start_edit_info");
-            app('telegram_bot')->sendMessage($chat_id, "ยกเลิกคำสั่งปัจจุบันเรียบร้อยแล้ว");
+            if ($chat_id) {
+                $this->forgetUserCache($chat_id);
+                app('telegram_bot')->sendMessage($chat_id, "ยกเลิกคำสั่งปัจจุบันเรียบร้อยแล้ว");
+            }
             return;
         }
 
@@ -72,7 +72,37 @@ class TelegramController extends Controller
         if (cache()->has("chat_id_{$chat_id}_start_set_info")) {
             $step = cache()->get("chat_id_{$chat_id}_start_set_info");
             if ($step === 'waiting_for_command') {
-                return $this->showSetInfoForm($chat_id, $request);
+                $user_information_lines = explode("\n", $request->message['text']);
+                if (count($user_information_lines) === 5) {
+                    $name = trim($user_information_lines[0]);
+                    $student_id = trim($user_information_lines[1]);
+                    $phone_number = trim(preg_replace('/\D/', '', $user_information_lines[2]));
+                    $branch = isset($user_information_lines[3]) ? trim($user_information_lines[3]) : '';
+                    $company = isset($user_information_lines[4]) ? trim($user_information_lines[4]) : '';
+
+                    $text = "ข้อมูลที่คุณกรอกมีดังนี้:\n";
+                    $text .= "ชื่อ-นามสกุล: $name\n";
+                    $text .= "รหัสนิสิต: $student_id\n";
+                    $text .= "เบอร์โทรศัพท์: $phone_number\n";
+                    $text .= "สาขาวิชา: $branch\n";
+                    $text .= "สถานประกอบการ: $company\n";
+                    $text .= "ถูกต้องมั้ยคะ? (กรุณาตอบ /yes หรือ /cancel)";
+
+                    $result = app('telegram_bot')->sendMessage($chat_id, $text);
+
+                    cache()->put("chat_id_{$chat_id}_start_set_info", 'confirm', now()->addMinutes(60));
+                    cache()->put("chat_id_{$chat_id}_user_info", compact('name', 'student_id', 'phone_number', 'branch', 'company'));
+                    return response()->json($result, 200);
+                } else {
+                    $text = "กรุณากรอกข้อมูลให้ครบถ้วนตามรูปแบบที่กำหนด:\n";
+                    $text .= "ชื่อ-นามสกุล\n";
+                    $text .= "รหัสนิสิต\n";
+                    $text .= "เบอร์โทรศัพท์\n";
+                    $text .= "สาขาวิชา\n";
+                    $text .= "สถานประกอบการ";
+                    $result = app('telegram_bot')->sendMessage($chat_id, $text);
+                    return response()->json($result, 200);
+                }
             } elseif ($step === 'confirm') {
                 return $this->handleConfirmation(
                     $request,
@@ -93,7 +123,7 @@ class TelegramController extends Controller
                             app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
                         }
                     }
-                );// check handle confirm true/false 
+                );
             }
         }
         //editinfo
@@ -118,7 +148,7 @@ class TelegramController extends Controller
             }
         }
 
-        if (cache()->has("chat_id_{$chat_id}_start_edit_info")) { //ถ้า cache เป็น status หรือ variable
+        if (cache()->has("chat_id_{$chat_id}_start_edit_info")) {
             $step = cache()->get("chat_id_{$chat_id}_start_edit_info");
             $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
             $user_info = $this->getUserInfo($chat_id);
@@ -1147,10 +1177,10 @@ class TelegramController extends Controller
         $request,
         $chat_id,
         $cacheKeys,
-        $cancel_message,//เอาออก
+        $cancel_message,
         $update_callback = null
     ) {
-        $confirmation_text = '/yes';//ซ้ำซ้อน
+        $confirmation_text = '/yes';
         $text = $request->message['text'];
 
         if ($text === $confirmation_text) {
@@ -1158,12 +1188,12 @@ class TelegramController extends Controller
                 $update_callback();
             } else {
                 app('telegram_bot')->sendMessage($chat_id, "ไม่พบข้อมูล user");
-            } //return true
+            }
         } elseif ($text === '/cancel') {
             app('telegram_bot')->sendMessage($chat_id, $cancel_message);
             foreach ($cacheKeys as $cacheKey) {
                 cache()->forget($cacheKey);
-            }//return false ot cancel
+            }
         } else {
             app('telegram_bot')->sendMessage($chat_id, "กรุณาตอบด้วย '/yes' หรือ '/cancel' เท่านั้นค่ะ");
         }
