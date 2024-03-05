@@ -500,7 +500,7 @@ class TelegramController extends Controller
                 } elseif (!empty($user_info['memo_time']) && empty($user_info['summary_time'])) {
                     $memo_time = Carbon::createFromFormat('H:i:s', $user_info['memo_time'])->format('H:i');
                     $text = "แจ้งเตือนการจดบันทึกประจำวันเวลา: {$memo_time} น.\n";
-                    $text .= "คุณยังไม่ได้สรุปงานประจำวัน!\n";
+                    $text .= "คุณยังไม่ได้ตั้งค่าเวลาสรุปงานประจำวัน!\n";
                     $text .= "กรุณา /setreminder เพื่อตั้งค่าเวลาสรุปงานประจำวัน";
                     $result = app('telegram_bot')->sendMessage($chat_id, $text);
                     return response()->json($result, 200);
@@ -1288,14 +1288,14 @@ class TelegramController extends Controller
         } else if ($user_info['memo_time'] && !$user_info['summary_time']) {
             $text = "กรุณาเลือกประเภทการแจ้งเตือนเพื่อแก้ไขเวลา:\n";
             $text .= "1. /formemo - แจ้งเตือนจดบันทึกงานประจำวัน\n";
-            $text .= "เนื่องจากคุณตั้งค่าเวลาแจ้งเตือน /formemo ไปแล้วเท่านั้น\nจึงสามารถแก้ไขได้รายการเดียว";
+            $text .= "เนื่องจากคุณตั้งค่าเวลาแจ้งเตือน /formemo ไปแล้วเท่านั้นจึงสามารถแก้ไขได้รายการเดียว";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'waiting_for_command', now()->addMinutes(60));
             return response()->json($result, 200);
         } else if (!$user_info['memo_time'] && $user_info['summary_time']) {
             $text = "กรุณาเลือกประเภทการแจ้งเตือนเพื่อแก้ไขเวลา:\n";
             $text .= "2. /forsummary - แจ้งเตือนสรุปงานประจำวัน\n";
-            $text .= "เนื่องจากคุณตั้งค่าเวลาแจ้งเตือน /forsummary ไปแล้วเท่านั้น\nจึงสามารถแก้ไขได้รายการเดียว";
+            $text .= "เนื่องจากคุณตั้งค่าเวลาแจ้งเตือน /forsummary ไปแล้วเท่านั้นจึงสามารถแก้ไขได้รายการเดียว";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'waiting_for_command', now()->addMinutes(60));
         } else {
