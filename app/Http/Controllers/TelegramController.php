@@ -159,8 +159,17 @@ class TelegramController extends Controller
                 $text .= "5. สถานประกอบการ: {$user_info['company']}\n";
                 $text .= "กรุณาตอบเป็นตัวเลข(1-5)";
                 cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_command', now()->addMinutes(60));
-                $result = app('telegram_bot')->sendMessage($chat_id, $text);
-                return response()->json($result, 200);
+                $options = [
+                    ['1. ชื่อ-นามสกุล'],
+                    ['2. รหัสนิสิต'],
+                    ['3. เบอร์โทรศัพท์'],
+                    ['4. สาขาวิชา'],
+                    ['5. สถานประกอบการ']
+                ];
+                // app('telegram_bot')->apiRequest('sendMessage', ['chat_id' => $chat_id, 'text' => $text, 'reply_markup' => app('telegram_bot')->keyboardBtn($options)]);
+                app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
+                // $result = app('telegram_bot')->sendMessage($chat_id, $text, app('telegram_bot')->keyboardBtn($options));
+                // return response()->json($result, 200);
             } else {
                 $text = "คุณยังไม่ได้ตั้งค่าข้อมูลส่วนตัว!\n";
                 $text .= "กรุณา /setinfo เพื่อตั้งค่าข้อมูลส่วนตัว";
@@ -174,8 +183,9 @@ class TelegramController extends Controller
             $select = cache()->get("chat_id_{$chat_id}_select_choice_edit");
             $user_info = $this->getUserInfo($chat_id);
             if ($step === 'waiting_for_command') {
-                $selected_index = (int) $request->message['text'];
-                if ($user_info && is_array($user_info->toArray()) && $selected_index >= 1 && $selected_index <= 5) {
+                $selected_index = (int)$request->message['text'];
+                // $user_info && is_array($user_info->toArray()) && 
+                if ($selected_index >= 1 && $selected_index <= 5) {
                     $column_name = [
                         1 => 'ชื่อ-นามสกุล',
                         2 => 'รหัสนิสิต',
@@ -183,6 +193,7 @@ class TelegramController extends Controller
                         4 => 'สาขาวิชา',
                         5 => 'สถานประกอบการ'
                     ];
+
                     $text = "กรุณากรอกข้อมูลดังกล่าวใหม่\n";
                     $text .= "$selected_index. {$column_name[$selected_index]}\n";
                     cache()->put("chat_id_{$chat_id}_start_edit_info", 'updated', now()->addMinutes(60));
@@ -738,9 +749,8 @@ class TelegramController extends Controller
             $select = cache()->get("chat_id_{$chat_id}_select_choice_edit_memo");
             $user_memo = $this->getUserMemo($chat_id);
             $memo_messages = explode(', ', $user_memo['memo']);
-
             if ($step === 'waiting_for_command') {
-                $selected_index = $request->message['text'];
+                $selected_index = (int)$request->message['text'];
                 if ($selected_index >= 1 && $selected_index <= count($memo_messages)) {
                     $text = "สามารถพิมพ์ข้อความเพื่อแก้ไขงานประจำวันได้เลยค่ะ\n";
                     $text .= "(สามารถแก้ไขได้เพียงข้อที่เลือก)\n";
@@ -1333,10 +1343,14 @@ class TelegramController extends Controller
             foreach ($current_memo as $key => $memo) {
                 $formatted_memo[] = ($key + 1) . ". " . $memo;
             }
+            $options = [];
+            foreach ($formatted_memo as $memo) {
+                $options[] = [$memo];
+            }
             $text = "กรุณาเลือกบันทึกที่ต้องการแก้ไข:\n" . implode("\n", $formatted_memo);
             $text .= "\nกรุณาตอบเพียงตัวเลขเดียวเท่านั้น ";
             cache()->put("chat_id_{$chat_id}_start_edit_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
             return response()->json($result, 200);
         }
     }
