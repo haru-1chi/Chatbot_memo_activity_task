@@ -158,7 +158,7 @@ class TelegramController extends Controller
                 $text .= "4. สาขาวิชา: {$user_info['branch']}\n";
                 $text .= "5. สถานประกอบการ: {$user_info['company']}\n";
                 $text .= "กรุณาตอบเป็นตัวเลข(1-5)";
-                cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_command', now()->addMinutes(60));
+                
                 $options = [
                     ['1. ชื่อ-นามสกุล'],
                     ['2. รหัสนิสิต'],
@@ -166,8 +166,10 @@ class TelegramController extends Controller
                     ['4. สาขาวิชา'],
                     ['5. สถานประกอบการ']
                 ];
+                cache()->put("chat_id_{$chat_id}_start_edit_info", 'waiting_for_command', now()->addMinutes(60));
+                $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
+                return response()->json($result, 200);
                 // app('telegram_bot')->apiRequest('sendMessage', ['chat_id' => $chat_id, 'text' => $text, 'reply_markup' => app('telegram_bot')->keyboardBtn($options)]);
-                app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
                 // $result = app('telegram_bot')->sendMessage($chat_id, $text, app('telegram_bot')->keyboardBtn($options));
                 // return response()->json($result, 200);
             } else {
@@ -1260,14 +1262,20 @@ class TelegramController extends Controller
         } else if ($user_info['memo_time'] && !$user_info['summary_time']) {
             $text = "คุณตั้งค่าเวลาแจ้งเตือนจดบันทึกงานประจำวัน เรียบร้อยแล้ว!\n";
             $text .= "กรุณา /forsummary เพื่อตั้งค่าแจ้งเตือนสรุปงานประจำวัน\n";
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $options = [
+                ['/forsummary']
+            ];
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
             cache()->put("chat_id_{$chat_id}_start_set_reminder", 'waiting_for_command', now()->addMinutes(60));
 
             return response()->json($result, 200);
         } else if (!$user_info['memo_time'] && $user_info['summary_time']) {
             $text = "คุณตั้งค่าเวลาแจ้งเตือนจดบันทึกงานประจำวัน เรียบร้อยแล้ว!\n";
             $text .= "กรุณา /formemo เพื่อตั้งค่าแจ้งเตือนสรุปงานประจำวัน\n";
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $options = [
+                ['/formemo']
+            ];
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
             cache()->put("chat_id_{$chat_id}_start_set_reminder", 'waiting_for_command', now()->addMinutes(60));
 
             return response()->json($result, 200);
@@ -1275,7 +1283,11 @@ class TelegramController extends Controller
             $text = "กรุณาเลือกประเภทการแจ้งเตือนเพื่อตั้งค่าเวลา:\n";
             $text .= "1. /formemo - แจ้งเตือนจดบันทึกงานประจำวัน\n";
             $text .= "2. /forsummary - แจ้งเตือนสรุปงานประจำวัน\n";
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $options = [
+                ['/formemo'],
+                ['/forsummary']
+            ];
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
 
             cache()->put("chat_id_{$chat_id}_start_set_reminder", 'waiting_for_command', now()->addMinutes(60));
 
@@ -1292,21 +1304,31 @@ class TelegramController extends Controller
             $text = "กรุณาเลือกประเภทการแจ้งเตือนเพื่อแก้ไขเวลา:\n";
             $text .= "1. /formemo - แจ้งเตือนจดบันทึกงานประจำวัน\n";
             $text .= "2. /forsummary - แจ้งเตือนสรุปงานประจำวัน\n";
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $options = [
+                ['/formemo'],
+                ['/forsummary']
+            ];
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
             cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'waiting_for_command', now()->addMinutes(60));
             return response()->json($result, 200);
         } else if ($user_info['memo_time'] && !$user_info['summary_time']) {
             $text = "กรุณาเลือกประเภทการแจ้งเตือนเพื่อแก้ไขเวลา:\n";
             $text .= "1. /formemo - แจ้งเตือนจดบันทึกงานประจำวัน\n";
             $text .= "เนื่องจากคุณตั้งค่าเวลาแจ้งเตือน /formemo ไปแล้วเท่านั้นจึงสามารถแก้ไขได้รายการเดียว";
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $options = [
+                ['/formemo']
+            ];
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
             cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'waiting_for_command', now()->addMinutes(60));
             return response()->json($result, 200);
         } else if (!$user_info['memo_time'] && $user_info['summary_time']) {
             $text = "กรุณาเลือกประเภทการแจ้งเตือนเพื่อแก้ไขเวลา:\n";
             $text .= "2. /forsummary - แจ้งเตือนสรุปงานประจำวัน\n";
             $text .= "เนื่องจากคุณตั้งค่าเวลาแจ้งเตือน /forsummary ไปแล้วเท่านั้นจึงสามารถแก้ไขได้รายการเดียว";
-            $result = app('telegram_bot')->sendMessage($chat_id, $text);
+            $options = [
+                ['/forsummary']
+            ];
+            $result = app('telegram_bot')->sendMessageWithKeyboard($chat_id, $text, $options);
             cache()->put("chat_id_{$chat_id}_start_edit_reminder", 'waiting_for_command', now()->addMinutes(60));
         } else {
             $text = "คุณยังไม่ได้ตั้งค่าเวลาแจ้งเตือนใดๆ\n";
