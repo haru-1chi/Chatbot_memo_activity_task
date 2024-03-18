@@ -39,16 +39,27 @@ class TelegramBot
     {
         $fileName = pathinfo($filePath, PATHINFO_BASENAME);
 
+        $ch = curl_init();
+
+        $url = "{$this->api_endpoint}/{$this->token}/sendDocument?chat_id={$chatId}";
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_POST, 1);
+
         $finfo = finfo_file(finfo_open(FILEINFO_MIME_TYPE), $filePath);
         $cFile = new \CURLFile($filePath, $finfo, $fileName);
 
-        $params = [
-            'chat_id' => $chatId,
-            'document' => $cFile,
-            'caption' => $fileName
-        ];
+        curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            "document" => $cFile,
+            "caption" => $fileName
+        ]);
 
-        return $this->apiRequest('sendDocument', $params);
+        $result = curl_exec($ch);
+
+        curl_close($ch);
+        
+        return $result;
     }
 
     public function sendMessageWithKeyboard($chatId, $text, $options)

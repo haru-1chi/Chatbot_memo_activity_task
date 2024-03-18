@@ -78,9 +78,9 @@ class SendSummaryDocument extends Command
     public function getUserMemo($telegram_chat_id)
     {
         $current_date = now()->toDateString();
-        return Memo::where('user_id', $telegram_chat_id)->where('memo_date', $current_date)->first();
+        $user_memo = Memo::where('user_id', $telegram_chat_id)->where('memo_date', $current_date)->first();
+        return $user_memo;
     }
-
 
     public function getUserInfo($telegram_chat_id)
     {
@@ -95,7 +95,8 @@ class SendSummaryDocument extends Command
         if (!file_exists(public_path($directory))) {
             mkdir(public_path($directory), 0777, true);
         }
-        $template_processor = new TemplateProcessor('word-template/user.docx');
+        $templatePath = public_path('word-template/user.docx');
+        $template_processor = new TemplateProcessor($templatePath);
         $memo_dates = Memo::where('user_id', $chat_id)
             ->pluck('memo_date')
             ->unique();
@@ -160,6 +161,16 @@ class SendSummaryDocument extends Command
         $day = date('d', strtotime($date));
 
         return "$day {$thai_months[$month]} $year";
+    }
+
+    private function getMemo($memo, $index)
+    {
+        if ($memo) {
+            $memoArray = explode(',', $memo);
+            return isset($memoArray[$index]) ? trim($memoArray[$index]) : '……………………………………………………………………………………';
+        } else {
+            return '……………………………………………………………………………………';
+        }
     }
     
         /**

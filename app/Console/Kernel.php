@@ -14,8 +14,9 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('send:memo-messages')->everyMinute();
         $schedule->command('send:summary-messages')->everyMinute();
-        // $schedule->command('send:summary-document')->everyMinute();
         // $schedule->command('send:summary-document')->saturdays()->at('10:00');
+        $schedule->command('send:summary-document')->everyMinute();
+        
     }
 
     /**
