@@ -567,7 +567,7 @@ class TelegramController extends Controller
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
-                        $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก";
+                        $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\nหรือหากต้องการยกเลิก ให้พิมพ์ /cancel";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
                     }
@@ -695,7 +695,7 @@ class TelegramController extends Controller
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_time', now()->addMinutes(60));
                     } else {
-                        $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก";
+                        $text = "\nกรุณาเพิ่มบันทึกประจำวันใหม่อีกครั้ง\nเมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\nหรือหากต้องการยกเลิก ให้พิมพ์ /cancel";
                         app('telegram_bot')->sendMessage($chat_id, $text);
                         cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
                     }
@@ -1388,7 +1388,7 @@ class TelegramController extends Controller
         } elseif ($user_memo['memo']) {
             $text = "สามารถพิมพ์ข้อความใดๆเพื่อเพิ่มบันทึกงานประจำวันได้เลยค่ะ\n";
             $text .= "ยกตัวอย่าง 'Create function CRUD'\n";
-            $text .= "เมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\n";
+            $text .= "เมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\nหรือหากต้องการยกเลิก ให้พิมพ์ /cancel\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             cache()->put("chat_id_{$chat_id}_start_add_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
             return response()->json($result, 200);
@@ -1401,7 +1401,7 @@ class TelegramController extends Controller
         if (!$user_memo || !$user_memo['memo']) {
             $text = "สามารถพิมพ์ข้อความใดๆเพื่อจดบันทึกงานประจำวันได้เลยค่ะ\n";
             $text .= "ยกตัวอย่าง 'Create function CRUD'\n";
-            $text .= "เมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\n";
+            $text .= "เมื่อจดบันทึกครบแล้ว ให้พิมพ์ /end เพื่อจบการบันทึก\nหรือหากต้องการยกเลิก ให้พิมพ์ /cancel\n";
             $result = app('telegram_bot')->sendMessage($chat_id, $text);
             cache()->put("chat_id_{$chat_id}_start_memo_dairy", 'waiting_for_command', now()->addMinutes(60));
             cache()->put("chat_id_{$chat_id}_memo_daily", [], now()->addMinutes(60));
